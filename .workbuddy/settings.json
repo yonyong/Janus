@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"D:/develop/project/Janus/.workbuddy/skills/comet/scripts/comet-hook-router.mjs\" --platform \"workbuddy\" --project-root \"D:/develop/project/Janus\"",
+            "description": "Route each write to the selected Comet Native or Classic phase guard"
+          }
+        ]
+      }
+    ]
+  }
+}

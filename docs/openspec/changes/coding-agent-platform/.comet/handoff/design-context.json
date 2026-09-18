@@ -1,0 +1,17 @@
+{
+  "change": "coding-agent-platform",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "7b1e1166576d7d0c03211a99e0ceea6abab2cbaad06959a5fc724742b023e9db",
+  "files": [
+    { "path": "docs/openspec/changes/coding-agent-platform/proposal.md", "sha256": "183a2e32b89686b047680f29f2607dd13ed54bffe100e0815e9ebdf30cf3fdda" },
+    { "path": "docs/openspec/changes/coding-agent-platform/design.md", "sha256": "84459d04934a3bb7059ac8cdcfa2ab139ecd61443763f97b607f0ff4f4458832" },
+    { "path": "docs/openspec/changes/coding-agent-platform/tasks.md", "sha256": "7d29e7c4ad726d0f9be9694513d53d4c367cbc6413082689cca7e874300c2c77" },
+    { "path": "docs/openspec/changes/coding-agent-platform/specs/coding-agent-management/spec.md", "sha256": "1622a2fd761a8993bc277e8bdaa845a92cc4eec844989b5c90a9d7eee99d83bd" },
+    { "path": "docs/openspec/changes/coding-agent-platform/specs/project-management/spec.md", "sha256": "eff88c53b783838046ff77c64ba7d2311f2eb9b7cb90e119c8f012678b86b26d" },
+    { "path": "docs/openspec/changes/coding-agent-platform/specs/requirement-design-workbench/spec.md", "sha256": "1588fc431701713b52322c17121231827938c8be797c5aab74d9e34d3e583bd7" },
+    { "path": "docs/openspec/changes/coding-agent-platform/specs/requirement-management/spec.md", "sha256": "1ce51a5e93229737cda31154993a11eac2b2a1b022faf6b9d4f2b0a6e1122e9a" }
+  ]
+}
