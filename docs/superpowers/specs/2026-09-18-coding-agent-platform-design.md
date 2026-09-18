@@ -2,6 +2,8 @@
 comet_change: coding-agent-platform
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-09-18-coding-agent-platform
+status: final
 ---
 
 # 编码 Agent 平台 — 深度技术设计（Design Doc）
