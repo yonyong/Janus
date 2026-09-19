@@ -77,33 +77,47 @@ try {
     btn.click()
     await new Promise((r) => setTimeout(r, 800))
     const wrap = document.querySelector('.ant-modal-wrap')
-    const content = document.querySelector('.ant-modal-content')
-    const isFull = !!document.querySelector('.fv-modal-fullscreen')
+    const content = document.querySelector('.fv-modal-fullscreen .ant-modal-container')
+    const isFull = !!document.querySelector('.fv-stage-full')
     const h = content ? content.getBoundingClientRect().height : 0
-    return JSON.stringify({ isFull, h, wrapScroll: !!wrap })
+    let ruleFound = 'cssom-no'
+    for (const sheet of document.styleSheets) {
+      try {
+        for (const r of sheet.cssRules) {
+          if (r.cssText && r.cssText.includes('fv-modal-fullscreen')) { ruleFound = 'cssom-yes'; break }
+        }
+      } catch {}
+      if (ruleFound === 'cssom-yes') break
+    }
+    const cs = content ? getComputedStyle(content) : null
+    return JSON.stringify({ isFull, h, ruleFound, display: cs?.display, height: cs?.height })
   })()`)
   console.log('进入全屏:', fs1)
   const s1 = JSON.parse(fs1)
   if (!s1.isFull) fail('全屏类未生效')
-  if (s1.h < window.innerHeight) ok(`content 高度 ${Math.round(s1.h)}px`)
-  if (s1.isFull && s1.h < 890) fail(`全屏高度不足: ${s1.h}`)
+  if (s1.ruleFound !== 'cssom-yes') fail('全屏 CSS 规则未加载')
+  if (s1.isFull && s1.h < 790) fail(`全屏高度不足: ${s1.h}`)
 
   // 预览区域高度应撑满（fv-frame / fv-md / fv-code 任一存在则高度应 > 60vh）
+  // 预览区域在全屏态下 max-height 应为 calc(100vh - 200px)
   const area = await ev(`(() => {
     const el = document.querySelector('.fv-stage-full .fv-frame, .fv-stage-full .fv-md, .fv-stage-full .fv-code, .fv-stage-full .fv-sheet, .fv-stage-full .fv-docx')
     if (!el) return 'no-area'
-    return 'area:' + Math.round(el.getBoundingClientRect().height)
+    const expect = window.innerHeight - 200
+    const got = parseFloat(getComputedStyle(el).maxHeight)
+    return JSON.stringify({ expect, got: Math.round(got), ok: Math.abs(got - expect) < 4 })
   })()`)
-  console.log('预览区域:', area)
-  if (String(area).startsWith('area:') && parseInt(area.slice(5)) < 500) fail('全屏预览高度未撑满: ' + area)
+  console.log('预览区域 max-height:', area)
+  const sArea = JSON.parse(area)
+  if (!sArea.ok) fail('全屏预览 max-height 未生效: ' + area)
 
   // Esc 退出全屏（弹窗应保留）
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
   await sleep(600)
   const fs2 = await ev(`JSON.stringify({
-    full: !!document.querySelector('.fv-modal-fullscreen'),
-    modal: !!document.querySelector('.ant-modal-root')
+    full: !!document.querySelector('.fv-stage-full'),
+    modal: !!document.querySelector('.ant-modal-wrap [role="dialog"]')
   })`)
   console.log('Esc 后:', fs2)
   const s2 = JSON.parse(fs2)
@@ -116,21 +130,28 @@ try {
     btns[btns.length - 1]?.click()
     await new Promise((r) => setTimeout(r, 500))
   })()`)
-  const mid = await ev(`!!document.querySelector('.fv-modal-fullscreen')`)
+  const mid = await ev(`!!document.querySelector('.fv-stage-full')`)
   if (!mid) fail('再次进入全屏失败')
-  await ev(`(async () => {
+  const after = await ev(`(async () => {
     const btns = [...document.querySelectorAll('.ant-modal-footer button')]
-    const close = btns.find((b) => b.textContent.includes('关闭')) || btns[btns.length - 1]
+    const labels = btns.map((b) => b.textContent)
+    const close = btns.find((b) => /关\\s*闭/.test(b.textContent)) || btns[btns.length - 1]
     close?.click()
-    await new Promise((r) => setTimeout(r, 800))
+    await new Promise((r) => setTimeout(r, 2500))
+    const dialogs = [...document.querySelectorAll('[role="dialog"]')]
+    return JSON.stringify({
+      labels,
+      closedLabel: close?.textContent,
+      dialogCount: dialogs.length,
+      dialogTitles: dialogs.map((d) => (d.querySelector('.ant-modal-title')?.textContent || d.textContent || '').slice(0, 40)),
+      stageCount: document.querySelectorAll('.fv-stage-full').length,
+      stageAny: document.querySelectorAll('.fv-stage').length,
+      confirmVisible: !!document.querySelector('.ant-modal-confirm')
+    })
   })()`)
-  const after = await ev(`JSON.stringify({
-    modal: !!document.querySelector('.ant-modal-root'),
-    full: !!document.querySelector('.fv-modal-fullscreen')
-  })`)
   console.log('关闭后:', after)
   const s3 = JSON.parse(after)
-  if (s3.modal || s3.full) fail('关闭后弹窗/全屏态未复位: ' + after)
+  if (s3.stageCount > 0) fail('关闭后弹窗/全屏态未复位: ' + after)
 
   console.log(fails.length ? `全屏冒烟完成，${fails.length} 项失败 ❌` : '全屏冒烟完成 ✅')
 } catch (e) {

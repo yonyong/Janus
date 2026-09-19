@@ -49,7 +49,9 @@ node tools/ui_smoke_workbench.mjs "http://127.0.0.1:8000/?token=<令牌>#/workbe
   （路径内嵌版，HTML 预览 iframe 专用，页面相对引用靠它解析）；`files.raw_meta` 做 MIME + 64MB 上限。
 - 前端：`web/src/components/FileViewer.tsx` 按扩展名分流（xlsx/csv=SheetJS、pdf/image=原生、
   docx=docx-preview、html=sandbox iframe、md=marked+DOMPurify、代码=highlight.js lib/common）；
-  FilePane 弹窗 Segmented：html/md=预览|源码、代码=语法高亮|源码、纯文本直编辑。
+  FilePane 弹窗 Segmented：html/md=预览|源码、代码=语法高亮|源码、纯文本直编辑；
+  弹窗支持全屏（标题栏按钮 + Esc 先退全屏；全屏 CSS 挂 `.fv-modal-fullscreen .ant-modal-container`，
+  预览高度 `.fv-stage-full` 下改 calc(100vh-200px)；一次性验证 tools/_verify_preview_fullscreen_once.mjs）。
 - 注意：docx-preview@0.4 无独立 CSS（JS 注入），import 其 min.css 会炸 build；CDP 冒烟脚本
   message handler 必须 `p.resolve(m)` 整条消息，resolve(m.result) 会让 evaluate 全静默返回 undefined。
 - 新增 `tools/ui_smoke_preview.mjs`（CDP 端到端预览冒烟，html/md/java/xlsx）。
@@ -75,6 +77,9 @@ node tools/ui_smoke_workbench.mjs "http://127.0.0.1:8000/?token=<令牌>#/workbe
 - **仓库常有第二个工作流并行改代码**：文件被改/无关测试失败/8000 端口被顶都是正常现象。
   处置：grep 确认自己符号还在 → HTTP 冒烟验证自己链路 → 别动对方代码、别"修"无关失败。
 - antd 是 6.x（Tree 无 expandAction、Modal 用 destroyOnHidden），传未声明属性直接 TS 报错。
+  antd 6 Modal：面板类名是 `.ant-modal-container`（非 v5 `.ant-modal-content`），styles 无 content 键；
+  wrapClassName 的类在弹窗关闭后仍残留 DOM（destroyOnHidden 只销毁内容），UI 冒烟判断弹窗态
+  要用内容元素而非 wrap 类；两字按钮被插空格（「关 闭」），按文本点按钮用 /关\s*闭/。
 - 删除操作被 safe-delete 包装：常报 SAFE_DELETE_FAIL_CLOSED 但其实已删，用目录列表复核，别重试。
 - 平台只有一个管理员（CAP_ADMIN_TOKEN），无多角色体系；业务侧写操作只需 ?token=。
 - **`Config.db_path` 硬编码 `BASE/data/app.db`，无环境变量覆盖**（CAP_DB_PATH 无效）：

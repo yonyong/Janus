@@ -1,0 +1,105 @@
+<svg width="1280" height="900" viewBox="0 0 1280 900" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F5F7FD"/>
+    </linearGradient>
+    <linearGradient id="gradIndigo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366F1"/><stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="5" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.08"/>
+    </filter>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748B"/>
+    </marker>
+    <marker id="arrAccent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6366F1"/>
+    </marker>
+  </defs>
+
+  <rect width="1280" height="900" fill="url(#bgGrad)"/>
+
+  <!-- header -->
+  <text x="60" y="52" font-size="11" font-weight="600" letter-spacing="3" fill="#818CF8">REQUIREMENT LIFECYCLE</text>
+  <text x="60" y="88" font-size="26" font-weight="700" fill="#0F172A">Requirement Flow</text>
+  <text x="1220" y="86" font-size="13" fill="#64748B" text-anchor="end">From token issuance to archive &amp; acceptance</text>
+
+  <!-- actors -->
+  <g filter="url(#cardShadow)">
+    <rect x="65" y="116" width="170" height="52" rx="12" fill="#0F172A"/>
+    <rect x="315" y="116" width="170" height="52" rx="12" fill="#0F172A"/>
+    <rect x="555" y="116" width="170" height="52" rx="12" fill="#0F172A"/>
+    <rect x="815" y="116" width="170" height="52" rx="12" fill="#0F172A"/>
+    <rect x="1065" y="116" width="170" height="52" rx="12" fill="#0F172A"/>
+  </g>
+  <text x="150" y="148" font-size="13.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">Administrator</text>
+  <text x="400" y="148" font-size="13.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">Business User</text>
+  <text x="640" y="148" font-size="13.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">Frontend</text>
+  <text x="900" y="148" font-size="13.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">Backend</text>
+  <text x="1150" y="148" font-size="13.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">Agent CLI</text>
+
+  <!-- lifelines -->
+  <line x1="150" y1="168" x2="150" y2="846" stroke="#CBD5E1" stroke-width="1.2" stroke-dasharray="4 5"/>
+  <line x1="400" y1="168" x2="400" y2="846" stroke="#CBD5E1" stroke-width="1.2" stroke-dasharray="4 5"/>
+  <line x1="640" y1="168" x2="640" y2="846" stroke="#CBD5E1" stroke-width="1.2" stroke-dasharray="4 5"/>
+  <line x1="900" y1="168" x2="900" y2="846" stroke="#CBD5E1" stroke-width="1.2" stroke-dasharray="4 5"/>
+  <line x1="1150" y1="168" x2="1150" y2="846" stroke="#CBD5E1" stroke-width="1.2" stroke-dasharray="4 5"/>
+
+  <!-- messages -->
+  <line x1="150" y1="212" x2="894" y2="212" stroke="#64748B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="525" y="202" font-size="12.5" fill="#334155" text-anchor="middle" style="paint-order:stroke" stroke="#FFFFFF" stroke-width="6">Create project · issue token</text>
+
+  <line x1="150" y1="252" x2="394" y2="252" stroke="#64748B" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#arr)"/>
+  <text x="275" y="242" font-size="12.5" fill="#334155" text-anchor="middle" style="paint-order:stroke" stroke="#FFFFFF" stroke-width="6">Send ?token= share link</text>
+
+  <line x1="400" y1="292" x2="634" y2="292" stroke="#64748B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="520" y="282" font-size="12.5" fill="#334155" text-anchor="middle" style="paint-order:stroke" stroke="#FFFFFF" stroke-width="6">Open link · token auto-login</text>
+
+  <line x1="400" y1="332" x2="894" y2="332" stroke="#64748B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="650" y="322" font-size="12.5" fill="#334155" text-anchor="middle" style="paint-order:stroke" stroke="#FFFFFF" stroke-width="6">Create requirement · enter workbench</text>
+
+  <!-- phase 1 note -->
+  <rect x="330" y="356" width="590" height="58" rx="10" fill="#EEF2FF" stroke="#C7D2FE"/>
+  <rect x="346" y="367" width="36" height="36" rx="9" fill="url(#gradIndigo)"/>
+  <text x="364" y="391" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">01</text>
+  <text x="398" y="381" font-size="13.5" font-weight="700" fill="#3730A3">Clarify</text>
+  <text x="398" y="402" font-size="12" fill="#4B5563">Write the requirement doc · AI polishing · version history &amp; rollback</text>
+
+  <!-- phase 2 note -->
+  <rect x="330" y="428" width="590" height="58" rx="10" fill="#EEF2FF" stroke="#C7D2FE"/>
+  <rect x="346" y="439" width="36" height="36" rx="9" fill="url(#gradIndigo)"/>
+  <text x="364" y="463" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">02</text>
+  <text x="398" y="453" font-size="13.5" font-weight="700" fill="#3730A3">Verify</text>
+  <text x="398" y="474" font-size="12" fill="#4B5563">Agent drafts use cases → imported on chat exit (dedup by title)</text>
+
+  <!-- phase 3 zone -->
+  <rect x="384" y="500" width="782" height="248" rx="14" fill="#F8FAFF" stroke="#E2E8F0"/>
+  <rect x="400" y="512" width="36" height="36" rx="9" fill="url(#gradIndigo)"/>
+  <text x="418" y="536" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">03</text>
+  <text x="452" y="536" font-size="13.5" font-weight="700" fill="#3730A3">Build</text>
+
+  <line x1="400" y1="574" x2="894" y2="574" stroke="#6366F1" stroke-width="1.6" marker-end="url(#arrAccent)"/>
+  <text x="650" y="564" font-size="12.5" font-weight="600" fill="#3730A3" text-anchor="middle" style="paint-order:stroke" stroke="#FFFFFF" stroke-width="6">Send chat message</text>
+
+  <line x1="900" y1="606" x2="1144" y2="606" stroke="#64748B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="1025" y="596" font-size="12.5" fill="#334155" text-anchor="middle" style="paint-order:stroke" stroke="#FFFFFF" stroke-width="6">Spawn subprocess (idempotent)</text>
+
+  <line x1="1150" y1="638" x2="906" y2="638" stroke="#64748B" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#arr)"/>
+  <text x="1025" y="628" font-size="12.5" fill="#334155" text-anchor="middle" style="paint-order:stroke" stroke="#FFFFFF" stroke-width="6">Event stream: diff · test results</text>
+
+  <line x1="900" y1="670" x2="646" y2="670" stroke="#64748B" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#arr)"/>
+  <text x="772" y="660" font-size="12.5" fill="#334155" text-anchor="middle" style="paint-order:stroke" stroke="#FFFFFF" stroke-width="6">SSE live streaming</text>
+
+  <path d="M900 694 h50 a9 9 0 0 1 9 9 v0 a9 9 0 0 1 -9 9 h-46" fill="none" stroke="#64748B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="976" y="709" font-size="12.5" fill="#334155" style="paint-order:stroke" stroke="#FFFFFF" stroke-width="6">Snapshot diff → persisted, rollback-able</text>
+
+  <line x1="400" y1="738" x2="894" y2="738" stroke="#64748B" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#arr)"/>
+  <text x="650" y="728" font-size="12.5" fill="#334155" text-anchor="middle" style="paint-order:stroke" stroke="#FFFFFF" stroke-width="6">Optional: roll back a file / the whole change</text>
+
+  <!-- phase 4 note -->
+  <rect x="330" y="768" width="590" height="58" rx="10" fill="#EEF2FF" stroke="#C7D2FE"/>
+  <rect x="346" y="779" width="36" height="36" rx="9" fill="url(#gradIndigo)"/>
+  <text x="364" y="803" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">04</text>
+  <text x="398" y="793" font-size="13.5" font-weight="700" fill="#3730A3">Archive</text>
+  <text x="398" y="814" font-size="12" fill="#4B5563">Summary of docs · cases · changes → approve / reject</text>
+</svg>

@@ -38,6 +38,20 @@ Janus 是一个本地部署的 Web 平台，解决一个典型痛点：**业务�
 - **配额与审计**：Agent token 用量按**日**限额（用满当日不可用、次日自动重置），管理员可查审计日志与调用明细。
 - **管理台**：项目、令牌、会话的统一管理入口，解决「第一枚令牌从哪来」的问题。
 
+### 架构图
+
+**业务架构** —— 两类角色与平台能力：
+
+![业务架构](docs/images/zh/business-architecture.svg)
+
+**技术架构** —— 从浏览器到磁盘的完整链路：
+
+![技术架构](docs/images/zh/tech-architecture.svg)
+
+**一次需求的完整流程**：
+
+![需求流程](docs/images/zh/requirement-flow.svg)
+
 ### 技术栈
 
 | 层 | 选型 |
@@ -48,32 +62,32 @@ Janus 是一个本地部署的 Web 平台，解决一个典型痛点：**业务�
 
 ### 快速开始
 
+Windows 下一键脚本搞定（在 `coding-agent-platform` 目录下）：
+
 ```bash
-# 1) 后端
+cd coding-agent-platform
+manage.bat build      # 构建 web/dist 并启动后端，访问 http://localhost:8000（生产模式，推荐）
+manage.bat dev        # 开发模式：后端 :8000 + Vite 热更新 :5173
+manage.bat stop       # 停止服务
+manage.bat status     # 查看运行状态
+```
+
+首次运行前准备一次依赖即可：
+
+```bash
 cd coding-agent-platform
 python -m venv .venv
-.venv/Scripts/activate            # Windows；Linux/macOS: source .venv/bin/activate
-pip install -r requirements.txt
-
-# 2) 前端（构建产物输出到 web/dist，由后端静态托管）
-cd web
-npm install
-npm run build
-cd ..
-
-# 3) 配置管理员口令（生产环境务必配置）
-echo CAP_ADMIN_TOKEN=your-admin-secret > .env
-
-# 4) 启动（默认 http://127.0.0.1:8000）
-python start.py
+.venv\Scripts\pip install -r requirements.txt    # Linux/macOS: .venv/bin/pip
+cd web && npm install && cd ..
 ```
 
-开发模式（前端热更新）：
+生产环境启动前配置管理员口令：
 
 ```bash
-python start.py                   # 终端 A：后端 :8000
-cd web && npm run dev             # 终端 B：Vite :5173，/api 已代理到 8000
+echo CAP_ADMIN_TOKEN=your-admin-secret > coding-agent-platform\.env
 ```
+
+> Linux / macOS 没有 `manage.bat`：在 `coding-agent-platform` 下执行 `npm run build` 后运行 `python start.py`（后端单进程托管 `web/dist`）。
 
 ### 使用流程
 
@@ -98,6 +112,7 @@ node tools/ui_smoke_auth.mjs http://127.0.0.1:8000 <管理员口令>
 ### 目录结构
 
 ```
+docs/images/               # 架构图（zh/ 中文版 · en/ 英文版，SVG）
 coding-agent-platform/
 ├── backend/
 │   ├── app.py               # 路由、鉴权、SSE、静态托管
@@ -162,6 +177,20 @@ rollback-able change records — **no git repository required**.
 - **Quota & audit**: agent token usage is capped **per day** (exhausted today, auto-reset tomorrow); admins can browse audit logs and invocation details.
 - **Admin console**: unified management for projects, tokens and sessions — solving "where does the first token come from".
 
+### Architecture
+
+**Business architecture** — two roles and platform capabilities:
+
+![Business architecture](docs/images/en/business-architecture.svg)
+
+**Technical architecture** — the full path from browser to disk:
+
+![Technical architecture](docs/images/en/tech-architecture.svg)
+
+**Lifecycle of one requirement**:
+
+![Requirement flow](docs/images/en/requirement-flow.svg)
+
 ### Tech Stack
 
 | Layer | Choice |
@@ -172,32 +201,32 @@ rollback-able change records — **no git repository required**.
 
 ### Quick Start
 
+On Windows, one script does everything (inside `coding-agent-platform/`):
+
 ```bash
-# 1) Backend
+cd coding-agent-platform
+manage.bat build      # Build web/dist and start the backend at http://localhost:8000 (production mode, recommended)
+manage.bat dev        # Dev mode: backend :8000 + Vite hot reload :5173
+manage.bat stop       # Stop services
+manage.bat status     # Show running status
+```
+
+One-time dependency setup before the first run:
+
+```bash
 cd coding-agent-platform
 python -m venv .venv
-source .venv/bin/activate         # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-
-# 2) Frontend (build output goes to web/dist, served by the backend)
-cd web
-npm install
-npm run build
-cd ..
-
-# 3) Set the admin passphrase (required for production)
-echo CAP_ADMIN_TOKEN=your-admin-secret > .env
-
-# 4) Start (defaults to http://127.0.0.1:8000)
-python start.py
+.venv\Scripts\pip install -r requirements.txt    # Linux/macOS: .venv/bin/pip
+cd web && npm install && cd ..
 ```
 
-Development mode (frontend hot reload):
+For production, set the admin passphrase before starting:
 
 ```bash
-python start.py                   # Terminal A: backend on :8000
-cd web && npm run dev             # Terminal B: Vite on :5173, /api proxied to :8000
+echo CAP_ADMIN_TOKEN=your-admin-secret > coding-agent-platform\.env
 ```
+
+> Linux / macOS (no `manage.bat`): inside `coding-agent-platform`, run `npm run build`, then `python start.py` (the backend serves `web/dist` in a single process).
 
 ### Usage
 
@@ -222,6 +251,7 @@ node tools/ui_smoke_auth.mjs http://127.0.0.1:8000 <admin-passphrase>
 ### Project Layout
 
 ```
+docs/images/               # Diagrams (zh/ Chinese · en/ English, SVG)
 coding-agent-platform/
 ├── backend/
 │   ├── app.py               # Routes, auth, SSE, static hosting

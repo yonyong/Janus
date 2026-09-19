@@ -2336,7 +2336,8 @@ pre.diff {
 }
 
 /* 预览弹窗全屏态（FilePane：fv-stage-full）：预览高度从固定 58vh 改为撑满视口 */
-.fv-modal-fullscreen .ant-modal-content {
+/* antd 6 弹窗主体类名是 .ant-modal-container（旧版为 .ant-modal-content） */
+.fv-modal-fullscreen .ant-modal-container {
   height: 100vh;
   display: flex;
   flex-direction: column;
