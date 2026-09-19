@@ -69,10 +69,14 @@ try {
     } catch { await sleep(300) }
   }
   const page = targets.find((t) => t.type === 'page')
-  ws = new WebSocket(page.webSocketDebuggerUrl, { perMessageDeflate: false })
-  await new Promise((r, j) => { ws.on('open', r); ws.on('error', j) })
-  ws.on('message', (d) => {
-    const m = JSON.parse(d)
+  ws = new WebSocket(page.webSocketDebuggerUrl)
+  await new Promise((resolve, reject) => {
+    ws.addEventListener('open', resolve, { once: true })
+    ws.addEventListener('error', reject, { once: true })
+  })
+  ws.addEventListener('message', (ev) => {
+    let m
+    try { m = JSON.parse(ev.data) } catch { return }
     if (m.id && pending.has(m.id)) { const p = pending.get(m.id); pending.delete(m.id); p.resolve(m) }
   })
   await send('Page.enable')
