@@ -1,0 +1,29 @@
+INFO:     Started server process [32548]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:63452 - "GET /api/projects?admin=janus-admin-3ead5e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63454 - "GET /api/sessions/1/active-run?admin=janus-admin-3ead5e HTTP/1.1" 200 OK
+INFO:     Started server process [11344]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+ERROR:    [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8000): [winerror 10048] 通常每个套接字地址(协议/网络地址/端口)只允许使用一次。
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Started server process [35536]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:60220 - "GET /api/admin/state?admin=janus-admin-3ead5e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56338 - "GET /api/admin/state HTTP/1.1" 200 OK
+INFO:     Started server process [12076]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:65264 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:65264 - "GET /assets/index-DQe1TVCS.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:51310 - "GET /assets/index-DMVM-f1a.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:51310 - "GET /api/token/verify?token=MQddZzKLqPEnV36c9l4hGw-Ta-zSiDMi&admin=janus-admin-3ead5e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51310 - "GET /api/admin/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65264 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62443 - "GET /api/admin/state HTTP/1.1" 200 OK

@@ -1,0 +1,13 @@
+# 本地环境配置（含管理员口令，禁止提交）
+.env
+# 数据与缓存
+data/
+__pycache__/
+*.pyc
+# 虚拟环境与前端依赖
+.venv/
+.wheels/
+node_modules/
+web/dist/
+# UI 冒烟截图产物
+.ui-smoke/

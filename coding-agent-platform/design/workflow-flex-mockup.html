@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>弹性工作流 UI 草案 · Janus</title>
+<style>
+  :root {
+    --primary: #1677ff;
+    --primary-bg: #e6f4ff;
+    --text: rgba(0,0,0,.88);
+    --text-2: rgba(0,0,0,.65);
+    --text-3: rgba(0,0,0,.45);
+    --border: #d9d9d9;
+    --border-split: #f0f0f0;
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --green: #52c41a;
+    --orange: #fa8c16;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 32px 24px 80px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 20px; margin-bottom: 6px; }
+  .sub { color: var(--text-2); font-size: 13px; margin-bottom: 28px; }
+  section {
+    background: var(--card);
+    border: 1px solid var(--border-split);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.03);
+  }
+  section > h2 { font-size: 15px; margin-bottom: 4px; }
+  section > p.note { color: var(--text-3); font-size: 12.5px; margin-bottom: 20px; }
+
+  /* ---------- 创建需求：模式选择 ---------- */
+  .mode-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .mode-card {
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    cursor: pointer;
+    transition: all .2s;
+    position: relative;
+  }
+  .mode-card:hover { border-color: var(--primary); }
+  .mode-card.active { border-color: var(--primary); background: var(--primary-bg); }
+  .mode-card .check {
+    position: absolute; top: 14px; right: 14px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--primary); color: #fff; font-size: 12px;
+    display: none; align-items: center; justify-content: center;
+  }
+  .mode-card.active .check { display: flex; }
+  .mode-card h3 { font-size: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .mode-card p { font-size: 12.5px; color: var(--text-2); line-height: 1.7; margin-bottom: 10px; }
+  .tag {
+    display: inline-block; font-size: 11px; padding: 1px 8px;
+    border-radius: 4px; line-height: 18px;
+  }
+  .tag.reco { background: var(--primary-bg); color: var(--primary); }
+  .tag.fast { background: #fff7e6; color: var(--orange); }
+  .mode-flow { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); flex-wrap: wrap; }
+  .mode-flow .node { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
+  .mode-flow .node.solid { border-color: var(--primary); color: var(--primary); background: #fff; }
+  .mode-flow .node.dashed { border-style: dashed; color: var(--text-3); background: #fafafa; }
+  .mode-flow .arr { color: var(--text-3); }
+
+  /* ---------- 步骤条 ---------- */
+  .steps-bar { display: flex; align-items: flex-start; padding: 12px 4px 4px; }
+  .step { flex: 1; position: relative; text-align: center; cursor: pointer; }
+  .step:last-child { flex: 0 0 auto; min-width: 110px; }
+  .step .dot {
+    width: 32px; height: 32px; border-radius: 50%;
+    margin: 0 auto 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; position: relative; z-index: 1;
+    background: #fff; border: 1.5px solid var(--border); color: var(--text-3);
+    transition: all .2s;
+  }
+  .step.active .dot { border-color: var(--primary); color: var(--primary); box-shadow: 0 0 0 3px var(--primary-bg); }
+  .step.done .dot { border-color: var(--primary); background: var(--primary); color: #fff; }
+  .step.skipped .dot { border-style: dashed; background: #fafafa; color: var(--text-3); }
+  .step .lbl { font-size: 13px; font-weight: 500; }
+  .step .desc { font-size: 11.5px; color: var(--text-3); margin-top: 3px; }
+  .step .line {
+    position: absolute; top: 16px; left: calc(-50% + 20px); right: calc(50% + 20px);
+    height: 1.5px; background: var(--border);
+  }
+  .step:first-child .line { display: none; }
+  .step.done-line .line, .step.skipped-line .line { background: var(--primary); }
+  .skip-badge {
+    display: inline-block; font-size: 10.5px; color: var(--text-3);
+    border: 1px dashed var(--border); border-radius: 999px;
+    padding: 0 7px; line-height: 16px; margin-top: 4px; background: #fafafa;
+  }
+  .skip-badge.warn { color: var(--orange); border-color: #ffd591; background: #fff7e6; }
+
+  /* 轻量模式：主轴三节点 + 可选子动作 */
+  .lite-extra { display: flex; gap: 8px; justify-content: center; margin-top: 6px; flex-wrap: wrap; }
+  .lite-extra .pill {
+    font-size: 11px; color: var(--text-2); border: 1px dashed var(--border);
+    border-radius: 999px; padding: 2px 10px; background: #fafafa; cursor: pointer;
+  }
+  .lite-extra .pill:hover { color: var(--primary); border-color: var(--primary); }
+  .lite-extra .pill .plus { color: var(--primary); margin-right: 3px; }
+
+  /* ---------- 状态 chips ---------- */
+  .toolbar { display: flex; gap: 8px; margin: 8px 0 4px; flex-wrap: wrap; }
+  .btn {
+    font-size: 12.5px; padding: 5px 14px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--border); background: #fff; color: var(--text);
+  }
+  .btn:hover { border-color: var(--primary); color: var(--primary); }
+  .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .btn.primary:hover { opacity: .88; color: #fff; }
+
+  .tip {
+    margin-top: 16px; font-size: 12.5px; line-height: 1.7;
+    background: #fffbe6; border: 1px solid #ffe58f; border-radius: 8px;
+    padding: 10px 14px; color: var(--text-2);
+  }
+  .tip b { color: var(--text); }
+
+  /* 归档弹窗示意 */
+  .dialog { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; max-width: 520px; margin: 16px auto 0; box-shadow: 0 6px 16px rgba(0,0,0,.08); }
+  .dialog .dlg-head { background: #fff; border-bottom: 1px solid var(--border-split); padding: 14px 20px; font-size: 14px; font-weight: 600; }
+  .dialog .dlg-body { padding: 18px 20px; font-size: 13px; color: var(--text-2); line-height: 1.8; }
+  .dialog .dlg-foot { border-top: 1px solid var(--border-split); padding: 12px 20px; display: flex; justify-content: flex-end; gap: 8px; background: #fafafa; }
+  .dlg-item { display: flex; align-items: center; gap: 8px; }
+  .dot-ok { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+  .dot-warn { width: 7px; height: 7px; border-radius: 50%; background: var(--orange); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>弹性工作流 UI 草案</h1>
+  <p class="sub">主轴恒为「定义 → 实现 → 归档」，澄清与用例变为可选增强；归档验收是唯一硬约束。</p>
+
+  <!-- 1. 创建需求 -->
+  <section>
+    <h2>① 创建需求时选模式</h2>
+    <p class="note">点击卡片可切换选中态。默认标准；小需求选轻量，创建后仍可补做被跳过的阶段。</p>
+    <div class="mode-cards">
+      <div class="mode-card active" onclick="pick(this)">
+        <span class="check">✓</span>
+        <h3>标准流程 <span class="tag reco">推荐</span></h3>
+        <p>适合功能开发：先澄清需求、配置用例，再编码，验收依据充分。</p>
+        <div class="mode-flow">
+          <span class="node solid">需求澄清</span><span class="arr">→</span>
+          <span class="node solid">用例配置</span><span class="arr">→</span>
+          <span class="node solid">编码实现</span><span class="arr">→</span>
+          <span class="node solid">归档验收</span>
+        </div>
+      </div>
+      <div class="mode-card" onclick="pick(this)">
+        <span class="check">✓</span>
+        <h3>轻量流程 <span class="tag fast">快速</span></h3>
+        <p>适合小改动：跳过澄清与用例，直接对话实现，归档时仅以改动记录作为依据。</p>
+        <div class="mode-flow">
+          <span class="node dashed">澄清 / 用例（可选）</span><span class="arr">→</span>
+          <span class="node solid">编码实现</span><span class="arr">→</span>
+          <span class="node solid">归档验收</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. 步骤条形态 -->
+  <section>
+    <h2>② 工作台顶部步骤条：两种形态</h2>
+    <p class="note">同一组件、两种渲染。虚线节点 = 可跳过 / 已跳过，点击即可进入补做。</p>
+
+    <div class="toolbar">
+      <button class="btn primary" id="tb-full" onclick="showMode('full')">标准模式</button>
+      <button class="btn" id="tb-lite" onclick="showMode('lite')">轻量模式</button>
+    </div>
+
+    <!-- 标准模式步骤条 -->
+    <div class="steps-bar" id="steps-full">
+      <div class="step done done-line" >
+        <div class="line"></div>
+        <div class="dot">✓</div>
+        <div class="lbl">需求澄清</div>
+        <div class="desc">文档 860 字 · 2 个版本</div>
+      </div>
+      <div class="step done done-line">
+        <div class="line"></div>
+        <div class="dot">✓</div>
+        <div class="lbl">用例配置</div>
+        <div class="desc">12 条用例 · 全部通过</div>
+      </div>
+      <div class="step active">
+        <div class="line"></div>
+        <div class="dot">⌨</div>
+        <div class="lbl">编码实现</div>
+        <div class="desc">3 次会话 · 改动 5 个文件</div>
+      </div>
+      <div class="step">
+        <div class="line"></div>
+        <div class="dot">📦</div>
+        <div class="lbl">归档验收</div>
+        <div class="desc">待验收</div>
+      </div>
+    </div>
+
+    <!-- 轻量模式步骤条 -->
+    <div class="steps-bar" id="steps-lite" style="display:none">
+      <div class="step skipped skipped-line">
+        <div class="line"></div>
+        <div class="dot">✎</div>
+        <div class="lbl">定义 <span style="font-weight:400;color:var(--text-3)">（可选）</span></div>
+        <div class="desc">仅原始需求描述</div>
+        <span class="skip-badge">澄清 · 用例 未启用</span>
+        <div class="lite-extra">
+          <span class="pill"><span class="plus">＋</span>补做澄清</span>
+          <span class="pill"><span class="plus">＋</span>补配用例</span>
+        </div>
+      </div>
+      <div class="step active">
+        <div class="line"></div>
+        <div class="dot">⌨</div>
+        <div class="lbl">编码实现</div>
+        <div class="desc">1 次会话 · 改动 2 个文件</div>
+      </div>
+      <div class="step">
+        <div class="line"></div>
+        <div class="dot">📦</div>
+        <div class="lbl">归档验收</div>
+        <div class="desc">可随时归档</div>
+      </div>
+    </div>
+
+    <div class="tip" id="tip-full" style="display:none">
+      <b>标准模式</b>：与现状一致。区别仅在于澄清 / 用例节点右上出现「可跳过」能力——右键或 hover 出现「跳过此步」，跳过后节点变虚线、标「已跳过」，不影响后续。
+    </div>
+    <div class="tip" id="tip-lite">
+      <b>轻量模式</b>：主轴只有三格。「定义」节点下挂两个虚线 pill，任何时候点一下即补做对应阶段（就地展开，不改变主轴）。归档入口常驻右侧，不强制先完成前置。
+    </div>
+  </section>
+
+  <!-- 3. 归档弱提示 -->
+  <section>
+    <h2>③ 归档是唯一硬约束：缺依据时弱提示、不阻断</h2>
+    <p class="note">轻量需求（或跳过了用例的需求）点「归档验收」时的确认弹窗示意。</p>
+    <div class="dialog">
+      <div class="dlg-head">归档验收</div>
+      <div class="dlg-body">
+        <div class="dlg-item"><span class="dot-ok"></span>改动记录：2 次会话，共改动 3 个文件（可回退）</div>
+        <div class="dlg-item"><span class="dot-ok"></span>需求文档：仅原始描述，未做澄清增强</div>
+        <div class="dlg-item"><span class="dot-warn"></span>验收依据：未配置用例，本次验收以改动记录 + 对话结论为准</div>
+        <br>
+        归档后需求进入只读，标题与文档不可再修改。是否继续？
+      </div>
+      <div class="dlg-foot">
+        <button class="btn" onclick="alert('返回工作台（示意）')">再改改</button>
+        <button class="btn" onclick="alert('补配用例（示意）：跳到用例配置')">先补用例</button>
+        <button class="btn primary" onclick="alert('已归档（示意）')">确认归档</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  function pick(el) {
+    document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+  function showMode(m) {
+    document.getElementById('steps-full').style.display = m === 'full' ? 'flex' : 'none';
+    document.getElementById('steps-lite').style.display = m === 'lite' ? 'flex' : 'none';
+    document.getElementById('tip-full').style.display = m === 'full' ? 'block' : 'none';
+    document.getElementById('tip-lite').style.display = m === 'lite' ? 'block' : 'none';
+    document.getElementById('tb-full').classList.toggle('primary', m === 'full');
+    document.getElementById('tb-lite').classList.toggle('primary', m === 'lite');
+  }
+</script>
+</body>
+</html>

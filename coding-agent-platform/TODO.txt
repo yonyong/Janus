@@ -1,0 +1,42 @@
+# coding-agent-platform 交接待办 (Handoff TODO)
+
+> 生成时间: 2026-09-18
+> 背景: 本仓库 coding-agent-platform 的 Comet change 已通过 verify 并归档
+>       (本地提交 d698db4),但整个实现目录此前从未纳入版本控制 (untracked)。
+> 更新: 2026-09-18 — 待办 1 已取消(用户确认不需要); 待办 2 已完成。
+
+============================================================
+待办 1: [已取消] 将实现目录纳入 git 版本控制并提交
+============================================================
+用户确认不需要,已移除。
+
+============================================================
+待办 2: [已完成] 首次启动前安装依赖 (前置条件)
+============================================================
+- 后端依赖已安装到 .venv (Python 3.13.14):
+    fastapi 0.141.1, uvicorn 0.53.0 及标准扩展 (httptools/watchfiles/websockets 等)
+- 前端依赖已安装到 web/node_modules (npm install, react 18.3.1 + vite 5.4.x)
+
+- 冒烟测试全部通过:
+    * 后端 8000: /openapi.json 返回 200, /api/agents 返回 200
+    * 前端 build: tsc + vite build 成功, 生成 web/dist
+    * build 模式: 后端托管 web/dist, 根路径 / 返回 200 (<title>编码 Agent 平台</title>)
+    * dev 模式: Vite dev 5173 返回 200
+
+- 注意事项(后续接手必读):
+    1. 依赖已就绪, 之后启动无需再装依赖, 直接 manage.bat dev / build 即可。
+    2. pip 默认源为清华镜像 (pypi.tuna.tsinghua.edu.cn), 速度快、保持默认即可。
+       安装时若偶发 "Could not find a version ... (from versions: none)", 多为镜像
+       瞬时抖动, 重试或临时加 --index-url https://pypi.org/simple 即可 (官方源较慢)。
+    3. .wheels/ 目录内是历史离线下载的 wheel, 其中编译型为 cp310 (Python 3.10),
+       与当前 .venv 的 Python 3.13 不匹配, 已弃用。
+
+============================================================
+启停脚本速查 (交接参考)
+============================================================
+  manage.bat dev              后端 8000 + 前端 Vite dev 5173 (热更新, 默认)
+  manage.bat build            先 npm run build 到 web/dist, 再起后端 8000 托管 (单进程)
+  manage.bat start            dev 的别名
+  manage.bat stop             按端口杀 8000/5173 并关日志窗口
+  manage.bat restart [dev|build]   先停后起 (无参默认 dev)
+  薄包装: start.bat / stop.bat / build.bat   (双击即用)
