@@ -121,10 +121,16 @@ def test_build_cli_json_output_only_for_flagged_specs_and_user_override_wins():
                             cb._CLI_SPECS["codebuddy"])
         assert cli.count("--output-format") == 1
         assert cli[cli.index("--output-format") + 1] == "json"
-        # codex / cursor 规格没有流式与 json 模式，行为不变
-        for t in ("codex", "cursor"):
-            cli = cb._build_cli({}, "hi", cb._CLI_SPECS[t])
-            assert "--output-format" not in cli
+        # codex 规格没有流式与 json 模式，行为不变；cursor 开了 json_result 会追加 json 模式
+        cli = cb._build_cli({}, "hi", cb._CLI_SPECS["codex"])
+        assert "--output-format" not in cli
+        cli = cb._build_cli({}, "hi", cb._CLI_SPECS["cursor"])
+        assert cli.count("--output-format") == 1
+        assert cli[cli.index("--output-format") + 1] == "json"
+        # 用户给 cursor 自带 --output-format 时以用户为准，不重复加
+        cli = cb._build_cli({"args": ["--output-format", "json"]}, "hi",
+                            cb._CLI_SPECS["cursor"])
+        assert cli.count("--output-format") == 1
     finally:
         cb.shutil.which = orig
 
@@ -155,6 +161,22 @@ def test_normalize_usage_aggregates_cache_into_prompt():
     assert cb.normalize_usage({}) is None
     assert cb.normalize_usage(None) is None
     assert cb.normalize_usage("usage") is None
+
+
+def test_normalize_usage_accepts_cursor_camel_case():
+    """cursor 的 usage 是 camelCase 键名（inputTokens/outputTokens/cacheReadTokens/
+    cacheWriteTokens），同样要把缓存计入 prompt，缺失 total 时用和补齐。"""
+    got = cb.normalize_usage({"inputTokens": 13761, "outputTokens": 62,
+                              "cacheReadTokens": 9600, "cacheWriteTokens": 0})
+    assert got == {"prompt_tokens": 13761 + 9600, "completion_tokens": 62,
+                   "total_tokens": 13761 + 9600 + 62}
+    # 缓存全零时不虚增
+    got = cb.normalize_usage({"inputTokens": 10, "outputTokens": 5})
+    assert got == {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+    # 混合风格也不怕（同义键并存时按顺序取第一个存在的键）
+    got = cb.normalize_usage({"input_tokens": 7, "outputTokens": 3})
+    assert got == {"prompt_tokens": 7, "completion_tokens": 3, "total_tokens": 10}
+    assert cb.normalize_usage({"cacheReadTokens": 0}) is None
 
 
 def test_parse_result_json_reads_result_and_usage():
@@ -247,7 +269,7 @@ def test_build_cli_specs_for_all_cli_types():
         cases = {
             "claude": ["claude", "-p", "--dangerously-skip-permissions"],
             "codex": ["codex", "exec", "--full-auto", "--skip-git-repo-check"],
-            "cursor": ["cursor-agent", "-p"],
+            "cursor": ["cursor-agent", "-p", "--trust"],
             "codebuddy": ["codebuddy", "-p", "-y"],
         }
         for t, prefix in cases.items():

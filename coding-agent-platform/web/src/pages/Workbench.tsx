@@ -10,11 +10,13 @@ import {
   HistoryOutlined,
   PauseCircleOutlined,
   PlusOutlined,
+  SwapOutlined,
 } from '@ant-design/icons'
 import { useToken } from '../auth'
 import {
   Message,
   Requirement,
+  ReqMode,
   SessionDetail,
   Stage,
   TestCase,
@@ -31,6 +33,7 @@ import {
   sessionMessages,
   setRequirementStage,
   streamEvents,
+  updateRequirement,
 } from '../api'
 import type { QuickCommand, RequirementPaneHandle } from '../components/RequirementPane'
 import WorkflowSteps from '../components/WorkflowSteps'
@@ -354,6 +357,44 @@ export default function Workbench() {
     }
   }
 
+  /** 切换工作流模式（标准 / 轻量）：只改渲染形态与归档提示口径，不动阶段与数据。 */
+  const [switchingMode, setSwitchingMode] = useState(false)
+  const changeMode = async (m: ReqMode) => {
+    if (rid === null || requirement?.mode === m) return
+    setSwitchingMode(true)
+    try {
+      const r = await updateRequirement(token, rid, { mode: m })
+      setRequirement(r)
+      await loadFlow(true)
+      message.success(m === 'lite' ? '已切换为轻量流程：澄清与用例变为可选' : '已切换为标准流程')
+    } catch (e) {
+      const i = describeError(e)
+      message.error(`${i.title}${i.detail ? '：' + i.detail : ''}`)
+    } finally {
+      setSwitchingMode(false)
+    }
+  }
+
+  const modeMenu = (
+    <Dropdown
+      trigger={['click']}
+      disabled={busy}
+      menu={{
+        selectable: true,
+        selectedKeys: [requirement?.mode === 'lite' ? 'lite' : 'full'],
+        items: [
+          { key: 'full', label: '标准流程（澄清 → 用例 → 编码 → 归档）' },
+          { key: 'lite', label: '轻量流程（定义可选 → 编码 → 归档）' },
+        ],
+        onClick: ({ key }) => void changeMode(key as ReqMode),
+      }}
+    >
+      <Button size="small" icon={<SwapOutlined />} loading={switchingMode}>
+        {requirement?.mode === 'lite' ? '轻量流程' : '标准流程'}
+      </Button>
+    </Dropdown>
+  )
+
   /**
    * 订阅一次 agent 运行的 SSE 流。用户点击发送与「刷新/断线后续传」共用：
    * 后端以 (session, message) 幂等，重连同一消息会续传同一 run，并从事件 0
@@ -606,7 +647,13 @@ export default function Workbench() {
         </Space>
       </div>
 
-      <WorkflowSteps stage={stage} flow={flow} busy={busy} onChange={(s) => void changeStage(s)} />
+      <WorkflowSteps
+        stage={stage}
+        flow={flow}
+        busy={busy}
+        onChange={(s) => void changeStage(s)}
+        trailing={rid === null ? undefined : modeMenu}
+      />
 
       <div className={`wb-body${stage === 'archive' ? ' wb-solo' : ''}`}>
         <section className="wb-left">

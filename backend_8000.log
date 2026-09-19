@@ -27,3 +27,12 @@ INFO:     127.0.0.1:51310 - "GET /api/token/verify?token=MQddZzKLqPEnV36c9l4hGw-
 INFO:     127.0.0.1:51310 - "GET /api/admin/state HTTP/1.1" 200 OK
 INFO:     127.0.0.1:65264 - "GET /api/agents HTTP/1.1" 200 OK
 INFO:     127.0.0.1:62443 - "GET /api/admin/state HTTP/1.1" 200 OK
+INFO:     Started server process [37704]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started server process [32448]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:57764 - "GET /api/admin/verify?admin=janus-admin-3ead5e HTTP/1.1" 200 OK

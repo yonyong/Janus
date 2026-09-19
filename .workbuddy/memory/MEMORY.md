@@ -59,6 +59,7 @@ node tools/ui_smoke_workbench.mjs "http://127.0.0.1:8000/?token=<令牌>#/workbe
 ## Agent 探测与宿主环境变量（最易复发）
 - 宿主会注入会话环境变量（SERVER__PORT、CODEBUDDY_*/CLAUDE_* 等）给子进程 → codebuddy CLI 误判
   在宿主网关内 → EADDRINUSE 静默挂死。**适配器 subprocess 必须过 `adapters/codebuddy.py::_clean_env()`**。
+- cursor 规格必须带 `--trust`（_CLI_SPECS），否则 cursor-agent 在临时目录弹 Workspace Trust 直接失败。
 - 超时终止要连进程树杀（`taskkill /F /T /PID`）；目录回收用 `agent_test._rmtree_with_retry`。
 - 排查"超时"：先查孤儿进程 → 换目录对照 → `env | grep` 找宿主注入；别信前端归因文案。
 

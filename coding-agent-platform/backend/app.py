@@ -686,11 +686,14 @@ def update_requirement(rid: int, body: RequirementUpdate, allowed: set = Depends
                                 detail="需求名称创建后不可修改（.janus/ 工作区目录名依据需求名称固定）")
     if body.stage is not None and body.stage not in STAGES:
         raise HTTPException(status_code=400, detail=f"阶段只能是 {'/'.join(STAGES)}")
+    # 工作流模式切换（工作台随时可切）：只认 full/lite，其余值忽略不报错
+    mode = body.mode if body.mode in ("full", "lite") else None
     source = body.source if body.source in R.VERSION_SOURCES else "manual"
     out = R.RequirementRepo.update(db, rid, title=title,
                                    description=body.description if body.description is not None else R.UNSET,
                                    design_doc=body.design_doc if body.design_doc is not None else R.UNSET,
-                                   stage=body.stage if body.stage is not None else R.UNSET)
+                                   stage=body.stage if body.stage is not None else R.UNSET,
+                                   mode=mode if mode is not None else R.UNSET)
     if title is not R.UNSET or body.description is not None:
         R.RequirementVersionRepo.create_if_changed(db, rid, out["title"], out["description"], source=source)
     # 文档正文有变时镜像到工作区，编码 Agent 才能按固定路径读到
@@ -710,6 +713,8 @@ def update_requirement(rid: int, body: RequirementUpdate, allowed: set = Depends
                                  "to_chars": len(body.design_doc)}
     if body.stage is not None and body.stage != (before.get("stage") or "clarify"):
         changed["stage"] = {"from": before.get("stage"), "to": body.stage}
+    if mode is not None and mode != (before.get("mode") or "full"):
+        changed["mode"] = {"from": before.get("mode") or "full", "to": mode}
     if changed:
         proj = R.ProjectRepo.get(db, out["project_id"])
         audit.log("requirement.update", target_type="requirement", target_id=rid,

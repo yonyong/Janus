@@ -612,11 +612,11 @@ export interface AiPolishResult {
   agent: string | null
 }
 
-/** 需求文档 / 阶段的部分更新。source 用于标注这版文档从哪来（手动保存 / AI 润色）。 */
+/** 需求文档 / 阶段 / 工作流模式的部分更新。source 用于标注这版文档从哪来（手动保存 / AI 润色）。 */
 export const updateRequirement = (
   token: string | null,
   rid: number,
-  body: { title?: string; description?: string; design_doc?: string; stage?: Stage; source?: DocSource },
+  body: { title?: string; description?: string; design_doc?: string; stage?: Stage; source?: DocSource; mode?: ReqMode },
 ) =>
   req(buildUrl(`/api/requirements/${rid}`, token), {
     method: 'PATCH',

@@ -280,3 +280,19 @@ def test_create_invalid_mode_falls_back_to_full():
         pid, RequirementCreate(title="乱传模式", mode="hack"), {pid}, conn)
     assert req["mode"] == "full"
     assert req["stage"] == "clarify"
+
+
+def test_patch_mode_switch():
+    """工作台随时切模式：PATCH mode 生效，非法值忽略，切回 full 也不丢。"""
+    conn = _db()
+    pid = R.ProjectRepo.create(conn, "demo", tempfile.mkdtemp(prefix="cap-lite-"))["id"]
+    req = app_module.create_requirement(
+        pid, RequirementCreate(title="回归需求", mode="full"), {pid}, conn)
+    rid, allowed = req["id"], {pid}
+    out = _patch(conn, rid, allowed, mode="lite")
+    assert out["mode"] == "lite"
+    # 非法值只被忽略，不该把已有模式改坏
+    out2 = _patch(conn, rid, allowed, mode="hack")
+    assert out2["mode"] == "lite"
+    out3 = _patch(conn, rid, allowed, mode="full")
+    assert out3["mode"] == "full"
