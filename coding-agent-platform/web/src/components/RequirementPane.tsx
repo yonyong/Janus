@@ -3,11 +3,9 @@ import { Avatar, Empty, Modal, Space, Spin, Typography } from 'antd'
 import {
   ArrowRightOutlined,
   BulbOutlined,
-  DownOutlined,
   FileImageOutlined,
   FileOutlined,
   RobotOutlined,
-  ThunderboltOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import ChatPanel, { type ChatPanelHandle } from './ChatPanel'
@@ -57,14 +55,12 @@ const RequirementPane = forwardRef<
     sid?: number
     pid?: number | null
     token?: string | null
-    /** 非空时在输入框上方渲染常用指令按钮（编码实现阶段使用）。 */
+    /** 常用指令：输入 `/` 时在输入框上方唤起选择菜单（一行一个）。 */
     quickCommands?: QuickCommand[]
     /** 上一步完成后的下一步引导（如「润色完成 → 生成详细设计」）。 */
     stepHint?: StepHint | null
     /** 引导条上「进入下一环节」按钮的回调。 */
     onHintAction?: () => void
-    /** 引导用户点击的快捷指令 label，对应卡片高亮。 */
-    highlightCommand?: string
     /** Agent 运行中的「真中止」：调用后端中止接口并杀掉 CLI 子进程树。 */
     onAbort?: () => void
     /** 中止请求进行中（按钮转圈，防连点）。 */
@@ -82,14 +78,11 @@ const RequirementPane = forwardRef<
   quickCommands,
   stepHint,
   onHintAction,
-  highlightCommand,
   onAbort,
   aborting = false,
 }, ref) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const chatRef = useRef<ChatPanelHandle>(null)
-  // 常用指令条默认展开，用户可收起（避免长指令占用输入区上方空间）
-  const [qcOpen, setQcOpen] = useState(true)
   // 历史消息文件预览：点击附件 chip 打开
   const [preview, setPreview] = useState<{ path: string; ext: string; content: string; name: string } | null>(null)
 
@@ -232,36 +225,6 @@ const RequirementPane = forwardRef<
               {stepHint.actionLabel}
               <ArrowRightOutlined />
             </button>
-          )}
-        </div>
-      )}
-
-      {quickCommands && quickCommands.length > 0 && (
-        <div className={`quick-commands${qcOpen ? '' : ' is-closed'}`}>
-          <button type="button" className="qc-head qc-head-btn" onClick={() => setQcOpen((o) => !o)}>
-            <span className="qc-head-icon">
-              <ThunderboltOutlined />
-            </span>
-            <span className="qc-head-title">常用指令</span>
-            <span className="qc-head-hint">点一下填入输入框，确认无误后手动发送</span>
-            <DownOutlined className="qc-head-caret" />
-          </button>
-          {qcOpen && (
-            <div className="qc-list">
-              {quickCommands.map((c) => (
-                <button
-                  key={c.label}
-                  type="button"
-                  className={`qc-chip${highlightCommand === c.label ? ' is-highlight' : ''}`}
-                  disabled={busy}
-                  title={c.text}
-                  onClick={() => chatRef.current?.setDraft(c.text)}
-                >
-                  <span className="qc-chip-title">{c.label}</span>
-                  {c.desc && <span className="qc-chip-desc">{c.desc}</span>}
-                </button>
-              ))}
-            </div>
           )}
         </div>
       )}
