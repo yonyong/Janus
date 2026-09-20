@@ -131,6 +131,8 @@ class CaseIn(BaseModel):
     note: str = ""
     # 来源留空由接口决定：单条新增=manual，批量写入（AI 生成）=ai
     source: str | None = None
+    # 人工验收项：不进总验收脚本，由人在页面上勾选
+    is_manual: bool = False
 
 
 class CaseBulkIn(BaseModel):
@@ -149,6 +151,7 @@ class CaseUpdate(BaseModel):
     expected: str | None = None
     status: str | None = None
     note: str | None = None
+    is_manual: bool | None = None
 
 
 class ArchiveIn(BaseModel):

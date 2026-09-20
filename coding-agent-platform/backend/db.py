@@ -82,6 +82,8 @@ CREATE TABLE IF NOT EXISTS test_cases(
   status TEXT NOT NULL DEFAULT 'pending',
   note TEXT NOT NULL DEFAULT '',
   source TEXT NOT NULL DEFAULT 'manual',
+  -- 人工验收项：1 表示不进总验收脚本，由人在页面上逐条勾选（如目视样式）
+  is_manual INTEGER NOT NULL DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY(requirement_id) REFERENCES requirements(id)
@@ -236,6 +238,8 @@ _MIGRATIONS = [
     ("requirements", "updated_at", "TEXT"),
     # 底层 CLI 外部会话 id（--resume 续聊用）
     ("sessions", "cli_session_id", "TEXT"),
+    # 人工验收项标记（不进总验收脚本，人在页面勾选）
+    ("test_cases", "is_manual", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 

@@ -327,12 +327,12 @@ class TestCaseRepo:
 
     @staticmethod
     def create(conn, requirement_id, title, steps="", expected="", status="pending",
-               note="", source="manual"):
+               note="", source="manual", is_manual=0):
         cur = conn.execute(
-            """INSERT INTO test_cases(requirement_id,title,steps,expected,status,note,source)
-               VALUES(?,?,?,?,?,?,?)""",
+            """INSERT INTO test_cases(requirement_id,title,steps,expected,status,note,source,is_manual)
+               VALUES(?,?,?,?,?,?,?,?)""",
             (requirement_id, title, steps, expected, status if status in CASE_STATUSES else "pending",
-             note, source),
+             note, source, 1 if is_manual else 0),
         )
         conn.commit()
         return TestCaseRepo.get(conn, cur.lastrowid)
@@ -348,6 +348,7 @@ class TestCaseRepo:
             out.append(TestCaseRepo.create(
                 conn, requirement_id, title, it.get("steps") or "", it.get("expected") or "",
                 it.get("status") or "pending", it.get("note") or "", it.get("source") or source,
+                1 if it.get("is_manual") else 0,
             ))
         return out
 
@@ -363,11 +364,13 @@ class TestCaseRepo:
                              (requirement_id,)).fetchall()]
 
     @staticmethod
-    def update(conn, cid, title=_UNSET, steps=_UNSET, expected=_UNSET, status=_UNSET, note=_UNSET):
+    def update(conn, cid, title=_UNSET, steps=_UNSET, expected=_UNSET, status=_UNSET, note=_UNSET,
+               is_manual=_UNSET):
         fields = []
         args = []
         for col, val in (("title", title), ("steps", steps), ("expected", expected),
-                         ("status", status), ("note", note)):
+                         ("status", status), ("note", note),
+                         ("is_manual", (1 if is_manual else 0) if is_manual is not _UNSET else _UNSET)):
             if val is not _UNSET:
                 fields.append(f"{col}=?")
                 args.append(val)
@@ -387,7 +390,11 @@ class TestCaseRepo:
 
     @staticmethod
     def stats(conn, requirement_id) -> dict:
-        """按状态统计；结果里始终包含全部状态键，前端不必判空。"""
+        """按状态统计；结果里始终包含全部状态键，前端不必判空。
+
+        额外给出人工项计数：manual（标了人工的用例数）与 manual_pending（人工且尚未
+        勾选结果的数），供归档页展示「人工待核」。
+        """
         rows = conn.execute(
             "SELECT status, COUNT(*) AS n FROM test_cases WHERE requirement_id=? GROUP BY status",
             (requirement_id,),
@@ -400,6 +407,14 @@ class TestCaseRepo:
             total += r["n"]
         out["total"] = total
         out["done"] = out["passed"] + out["failed"] + out["skipped"]
+        mrow = conn.execute(
+            "SELECT COUNT(*) AS m, "
+            "SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) AS mp "
+            "FROM test_cases WHERE requirement_id=? AND is_manual=1",
+            (requirement_id,),
+        ).fetchone()
+        out["manual"] = mrow["m"] or 0
+        out["manual_pending"] = mrow["mp"] or 0
         return out
 
 

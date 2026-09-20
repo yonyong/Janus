@@ -42,6 +42,8 @@ _STATUS_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
 _RESULT_HEADER = ("结果", "结论", "status", "状态")
 # 表头里能认出「用例序号」列的关键词；都认不出时默认第一列就是序号
 _SEQ_HEADER = ("用例", "序号", "编号", "no", "#")
+# 表头里能认出「标题」列的关键词（覆盖度判定用）
+_TITLE_HEADER = ("标题", "用例名", "名称", "title", "name")
 
 
 def _match_status(cell: str) -> str | None:
@@ -136,6 +138,38 @@ def parse_report(content: str) -> dict[int, str]:
         row_no += 1
         result[_seq_of(cells[0], row_no)] = status
     return result
+
+
+def report_titles(content: str) -> set[str]:
+    """从报告表格「标题」列取出出现过的用例标题集合（用于覆盖度判定）。
+
+    仅在能识别出规整表头（含结果列 + 标题列 + `---` 分隔行）时返回标题；否则返回
+    空集（覆盖度未知，调用方不据此判「未覆盖」，避免误伤）。这里按原始行扫描（保留
+    分隔行），因为表头识别依赖它后面紧跟的 `---` 分隔行。
+    """
+    lines = [ln for ln in (content or "").splitlines()
+             if "|" in ln and ln.strip().startswith("|")]
+    for i, ln in enumerate(lines):
+        cells = _split_row(ln)
+        nxt = _split_row(lines[i + 1]) if i + 1 < len(lines) else None
+        if nxt is None or not _is_separator(nxt):
+            continue
+        low = [c.lower() for c in cells]
+        if not any(any(w in c for w in _RESULT_HEADER) for c in low):
+            continue
+        title_col = next((j for j, c in enumerate(low)
+                          if any(w in c for w in _TITLE_HEADER)), None)
+        if title_col is None:
+            return set()
+        titles: set[str] = set()
+        for dl in lines[i + 2:]:
+            r = _split_row(dl)
+            if _is_separator(r):
+                continue
+            if len(r) > title_col and r[title_col].strip():
+                titles.add(r[title_col].strip())
+        return titles
+    return set()
 
 
 def read_report(root: str, dir_name: str) -> str | None:
