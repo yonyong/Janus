@@ -25,15 +25,16 @@
   --text-disabled: #b7bcc4;
 
   /* 边框与底色 */
-  --border: #eff0f3;
-  --border-light: #f2f3f5;
-  --bg-page: #f5f6f7;
+  --border: #e5e7eb;
+  --border-light: #eef0f2;
+  /* 页面底色比卡片明显更沉，制造层次；卡片保持纯白浮起 */
+  --bg-page: #eaecef;
   /* 卡片 / 面板 / 气泡等「浮起」表面：与 --bg-page 拉开层次（暗色下更亮，亮色下更白） */
   --bg-elevated: #ffffff;
-  --bg-soft: #fafbfc;
-  --bg-hover: #f7f9fc;
+  --bg-soft: #f4f5f7;
+  --bg-hover: #eef1f5;
   /* 下沉表面：代码块 / 输入框 / diff 等，比页面更沉一档 */
-  --bg-sunken: #f0f1f3;
+  --bg-sunken: #e3e6ea;
   /* 状态浅底（胶囊 / 高亮），暗色下会调深 */
   --tint-primary: #eef4ff;
   --tint-primary-border: #d4e2ff;
@@ -63,13 +64,13 @@
   --text-3: #6b6350;
   --text-4: #928a75;
   --text-disabled: #b6ad97;
-  --border: #e2dccc;
-  --border-light: #e9e3d4;
-  --bg-page: #efe9db;
-  --bg-elevated: #fbf7ee;
-  --bg-soft: #f4efe2;
-  --bg-hover: #f0ead9;
-  --bg-sunken: #ece5d4;
+  --border: #ddd4c0;
+  --border-light: #e6ddca;
+  --bg-page: #e6dfcc;
+  --bg-elevated: #fdfaf3;
+  --bg-soft: #f3ecdb;
+  --bg-hover: #ede4cf;
+  --bg-sunken: #e2d9c2;
   --tint-primary: #e3efe6;
   --tint-primary-border: #cfe4d3;
   --tint-success: #e3efe0;
@@ -78,8 +79,8 @@
   --diff-del-bg: #f4e2dc;
   --shadow-sm: 0 1px 3px rgba(90, 74, 40, 0.08);
   --shadow-md: 0 4px 16px rgba(90, 74, 40, 0.12);
-  --header-bg: rgba(251, 247, 238, 0.85);
-  --sider-bg: linear-gradient(180deg, #fbf7ee 0%, #f4efe2 100%);
+  --header-bg: rgba(253, 250, 243, 0.85);
+  --sider-bg: linear-gradient(180deg, #fdfaf3 0%, #f3ecdb 100%);
 }
 
 /* ---------- 主题：暗黑（深灰） ---------- */
@@ -98,13 +99,14 @@
   --text-3: #9aa0a8;
   --text-4: #767c85;
   --text-disabled: #5a606a;
-  --border: #333a45;
-  --border-light: #282e38;
-  --bg-page: #16181d;
-  --bg-elevated: #1e2128;
-  --bg-soft: #23262e;
-  --bg-hover: #262b34;
-  --bg-sunken: #131519;
+  --border: #363d49;
+  --border-light: #2a303b;
+  /* 页面最沉，卡片明显更亮，制造暗色下的层次感 */
+  --bg-page: #0f1116;
+  --bg-elevated: #1f232c;
+  --bg-soft: #272c37;
+  --bg-hover: #2b313d;
+  --bg-sunken: #0a0b0f;
   --tint-primary: #1f2b45;
   --tint-primary-border: #2f4066;
   --tint-success: #16301f;
@@ -113,8 +115,8 @@
   --diff-del-bg: #3d1f1e;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45);
-  --header-bg: rgba(30, 33, 40, 0.86);
-  --sider-bg: linear-gradient(180deg, #1e2128 0%, #191c22 100%);
+  --header-bg: rgba(31, 35, 44, 0.9);
+  --sider-bg: linear-gradient(180deg, #1f232c 0%, #171a21 100%);
 }
 
 /* ---------- 主题：深蓝墨（午夜蓝暗系） ---------- */
@@ -133,13 +135,13 @@
   --text-3: #94a0bd;
   --text-4: #6f7c9c;
   --text-disabled: #556084;
-  --border: #2c3a58;
-  --border-light: #233150;
-  --bg-page: #0f172a;
-  --bg-elevated: #1a2338;
-  --bg-soft: #1e293f;
-  --bg-hover: #253150;
-  --bg-sunken: #0b1120;
+  --border: #30405f;
+  --border-light: #253355;
+  --bg-page: #0a1120;
+  --bg-elevated: #1b2740;
+  --bg-soft: #22304c;
+  --bg-hover: #273657;
+  --bg-sunken: #060a14;
   --tint-primary: #1e2c4d;
   --tint-primary-border: #33456e;
   --tint-success: #12321f;
@@ -148,8 +150,8 @@
   --diff-del-bg: #3d1f20;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.45);
   --shadow-md: 0 6px 22px rgba(0, 0, 0, 0.5);
-  --header-bg: rgba(26, 35, 56, 0.86);
-  --sider-bg: linear-gradient(180deg, #1a2338 0%, #151d30 100%);
+  --header-bg: rgba(27, 39, 64, 0.9);
+  --sider-bg: linear-gradient(180deg, #1b2740 0%, #141c30 100%);
 }
 
 /* 主题切换按钮（顶栏 / 工作台顶条通用） */
@@ -403,7 +405,7 @@ body {
   border-radius: 16px;
   border: 1px solid var(--border);
   background: var(--bg-elevated);
-  box-shadow: 0 1px 3px rgba(31, 35, 41, 0.04);
+  box-shadow: var(--shadow-sm);
   transition: border-color 0.2s ease, box-shadow 0.24s ease, transform 0.24s ease;
 }
 
@@ -1281,7 +1283,7 @@ body.wb-dragging .wb-split::after {
   margin-bottom: 10px;
   overflow: hidden;
   background: var(--bg-elevated);
-  box-shadow: 0 1px 3px rgba(31, 35, 41, 0.04);
+  box-shadow: var(--shadow-sm);
 }
 
 .arc-card-head {
@@ -3259,7 +3261,7 @@ pre.diff {
   border-radius: 16px;
   border: 1px solid var(--border);
   background: var(--bg-elevated);
-  box-shadow: 0 1px 3px rgba(31, 35, 41, 0.04);
+  box-shadow: var(--shadow-sm);
 }
 
 /* 页头 */
