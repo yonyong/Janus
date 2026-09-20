@@ -1079,6 +1079,75 @@ body.wb-dragging .wb-split::after {
   white-space: nowrap;
 }
 
+/* 验收主操作条：生成脚本 / 执行验收 / 仅人工核对 + 脚本状态 */
+.case-accept {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.case-accept-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.case-accept-status {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.case-script-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.case-script-chip.is-none {
+  color: var(--text-4);
+  background: var(--bg-sunken);
+}
+
+.case-script-chip.is-stale {
+  color: var(--warning-strong);
+  background: var(--tint-danger);
+  border-color: var(--tint-primary-border);
+}
+
+.case-script-chip.is-ok {
+  color: var(--success-strong);
+  background: var(--tint-success);
+  border-color: var(--tint-primary-border);
+}
+
+.case-run-output {
+  margin: 0;
+  max-height: 56vh;
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-sunken);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-1);
+}
+
 .case-actions {
   flex: none;
   display: flex;
@@ -2384,6 +2453,159 @@ body.wb-dragging .wb-split::after {
   border-top: 1px solid var(--border-light);
   padding: 12px 16px 14px;
   background: var(--bg-elevated);
+}
+
+/* 斜杠指令菜单（输入 / 唤起，一行一个） */
+.slash-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+  padding: 6px;
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-md);
+}
+
+.slash-menu-head {
+  padding: 2px 8px 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-4);
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 2px;
+}
+
+/* 一行一个：整行块级按钮，标题 + 说明同一行左对齐 */
+.slash-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.slash-item:hover,
+.slash-item.is-active {
+  background: var(--tint-primary);
+}
+
+.slash-item-name {
+  flex: none;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.slash-item-desc {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--text-4);
+}
+
+/* 待发送附件 chip（输入框上方） */
+.composer-atts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.composer-att {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 3px 6px 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-soft);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+
+.composer-att-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-att-x {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: transparent;
+  color: var(--text-4);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.composer-att-x:hover {
+  color: var(--danger);
+  background: var(--bg-hover);
+}
+
+/* 历史消息里的文件 chip（点击预览） */
+.msg-atts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.msg-att {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text-1);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.msg-att:hover:not(:disabled) {
+  border-color: var(--tint-primary-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.msg-att:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* 用户气泡里的文件 chip 用半透明白描边，衬在蓝底上更清楚 */
+.bubble-me .msg-att {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
+}
+
+.bubble-me .msg-att:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.msg-att-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---------- 代码块 / diff ---------- */

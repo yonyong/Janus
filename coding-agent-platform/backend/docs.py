@@ -97,6 +97,24 @@ def usecase_attach_subdir(dir_name: str) -> str:
     return f"{dir_name}/usecase/attach"
 
 
+def chat_attach_subdir(dir_name: str) -> str:
+    """对话里粘贴/上传的文件落盘子目录：.janus/{dir}/chat/attach/。"""
+    return f"{dir_name}/chat/attach"
+
+
+# 一需求一份「总验收脚本」入口：日常验收只跑脚本（AI 不再临场想测法）。
+# 语言不限，约定入口文件名 accept.*；默认 accept.py，按扩展名选解释器（见 acceptance.py）。
+ACCEPT_CANDIDATES = ("accept.py", "accept.sh", "accept.mjs", "accept.js")
+
+
+def accept_script(dir_name: str, name: str = "accept.py") -> str:
+    return f"{JANUS_DIR}/{dir_name}/usecase/{name}"
+
+
+def usecase_dir(dir_name: str) -> str:
+    return f"{JANUS_DIR}/{dir_name}/usecase"
+
+
 def other_dir(dir_name: str) -> str:
     return f"{JANUS_DIR}/{dir_name}/other"
 
@@ -222,6 +240,8 @@ def export_test_cases(cases: list[dict], attachments: list[dict], dir_name: str 
             "## 路径约定",
             "",
             f"- 编码过程中的说明性文档（实现说明、决策记录等）写入 `{other_dir(dir_name)}/`；",
+            f"- 总验收脚本（一需求一份）入口：`{accept_script(dir_name)}`（语言不限，"
+            "默认 Python；脚本读取本清单、跳过标「人工」的用例、按标题逐条检查）；",
             f"- 全部用例执行完后，把测试报告写入 `{test_result_doc(dir_name)}`。"
             "报告必须是 Markdown 表格（表头：用例 | 标题 | 结果 | 说明，每条用例一行，"
             "结果列只能取：通过 / 失败 / 跳过 / 未执行）；平台解析该表格自动回写用例状态。",
@@ -240,6 +260,8 @@ def export_test_cases(cases: list[dict], attachments: list[dict], dir_name: str 
         lines.append(f"## 用例 {i:02d}：{c.get('title') or ''}")
         lines.append("")
         lines.append(f"- 状态：{c.get('status') or 'pending'}")
+        # 人工项：总验收脚本必须跳过，交给人在页面上逐条勾选
+        lines.append(f"- 人工：{'是' if c.get('is_manual') else '否'}")
         if (c.get("steps") or "").strip():
             lines.append("- 操作步骤：")
             for ln in str(c["steps"]).splitlines():

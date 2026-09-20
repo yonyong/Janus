@@ -560,6 +560,8 @@ export interface TestCase {
   status: CaseStatus
   note: string
   source: string
+  /** 人工验收项：不进总验收脚本，由人在页面上勾选。 */
+  is_manual?: boolean | number
   created_at?: string | null
   updated_at?: string | null
 }
@@ -571,6 +573,38 @@ export interface CaseStats {
   pending: number
   skipped: number
   done: number
+  /** 标了「人工」的用例数 / 其中尚未勾选结果的数（归档页「人工待核」）。 */
+  manual?: number
+  manual_pending?: number
+}
+
+/** 总验收脚本状态（一需求一份 accept.*）。 */
+export interface AcceptScriptStatus {
+  exists: boolean
+  path: string
+  name: string | null
+  mtime: string | null
+  stale: boolean
+  lang: string | null
+  coverage: {
+    known: boolean
+    covered_ids: number[]
+    uncovered_ids: number[]
+    uncovered: number
+  }
+}
+
+export interface AcceptRunResult {
+  ran: boolean
+  reason?: string
+  detail?: string
+  entry?: string
+  exit_code?: number
+  output?: string
+  truncated?: boolean
+  timeout?: number
+  lang?: string
+  sync?: { found: boolean; rows: number; updated: number; stats: Record<string, number> } | null
 }
 
 export interface ChangedFile {
@@ -657,7 +691,18 @@ export interface CaseInput {
   expected?: string
   status?: CaseStatus
   note?: string
+  is_manual?: boolean
 }
+
+/** 总验收脚本状态：是否存在、路径、是否过期、覆盖度。 */
+export const acceptScriptStatus = (token: string | null, rid: number) =>
+  req(buildUrl(`/api/requirements/${rid}/accept-script`, token)) as Promise<AcceptScriptStatus>
+
+/** 执行总验收脚本 → 解析测试报告回写用例状态。脚本不存在时 ran=false。 */
+export const runAcceptScript = (token: string | null, rid: number) =>
+  req(buildUrl(`/api/requirements/${rid}/accept-script/run`, token), {
+    method: 'POST',
+  }) as Promise<AcceptRunResult>
 
 export const createCase = (token: string | null, rid: number, body: CaseInput) =>
   req(buildUrl(`/api/requirements/${rid}/cases`, token), {
@@ -789,6 +834,22 @@ export async function uploadCaseAttachments(
 
 export const listAttachments = (token: string | null, rid: number) =>
   req(buildUrl(`/api/requirements/${rid}/attachments`, token)) as Promise<Attachment[]>
+
+/** 对话输入框粘贴/选择的文件：存 .janus/{dir}/chat/attach/，返回项目内相对路径。
+ *  路径随消息文本一并发出，Agent 可直接读取，历史消息里也能点开预览。 */
+export async function uploadSessionAttachments(
+  token: string | null,
+  sid: number,
+  files: File[],
+): Promise<{ path: string; filename: string; size: number }[]> {
+  const fd = new FormData()
+  for (const f of files) fd.append('files', f)
+  return req(buildUrl(`/api/sessions/${sid}/attachments`, token), {
+    method: 'POST',
+    body: fd,
+    timeoutMs: 120000,
+  }) as Promise<{ path: string; filename: string; size: number }[]>
+}
 
 export const deleteAttachment = (token: string | null, aid: number) =>
   req(buildUrl(`/api/attachments/${aid}`, token), { method: 'DELETE' }) as Promise<any>

@@ -50,6 +50,7 @@ def test_case_table_exists_on_fresh_db():
     assert R.TestCaseRepo.list_by_requirement(conn, rid) == []
     assert R.TestCaseRepo.stats(conn, rid) == {
         "pending": 0, "passed": 0, "failed": 0, "skipped": 0, "total": 0, "done": 0,
+        "manual": 0, "manual_pending": 0,
     }
 
 

@@ -1,16 +1,19 @@
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState } from 'react'
-import { Avatar, Empty, Space, Spin, Typography } from 'antd'
+import { Avatar, Empty, Modal, Space, Spin, Typography } from 'antd'
 import {
   ArrowRightOutlined,
   BulbOutlined,
-  DownOutlined,
+  FileImageOutlined,
+  FileOutlined,
   RobotOutlined,
-  ThunderboltOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import ChatPanel, { type ChatPanelHandle } from './ChatPanel'
 import RichText from './RichText'
 import AgentMarkdown from './AgentMarkdown'
+import FilePreview, { previewKindOf, hasPreviewMode } from './FileViewer'
+import { parseMessage, extOf, type ChatAttachment } from '../chatAttachments'
+import { uploadSessionAttachments, readFile } from '../api'
 
 /** 供父组件（如 Workbench）把快捷指令文本灌入输入框，不自动发送。 */
 export interface RequirementPaneHandle {
@@ -48,14 +51,16 @@ const RequirementPane = forwardRef<
     /** 瞬态状态提示（如「调用工具 …」），没有正文在流式时显示。 */
     statusText?: string
     onSend: (text: string) => void
-    /** 非空时在输入框上方渲染常用指令按钮（编码实现阶段使用）。 */
+    /** 会话/项目上下文：粘贴文件上传 + 历史消息文件预览用。 */
+    sid?: number
+    pid?: number | null
+    token?: string | null
+    /** 常用指令：输入 `/` 时在输入框上方唤起选择菜单（一行一个）。 */
     quickCommands?: QuickCommand[]
     /** 上一步完成后的下一步引导（如「润色完成 → 生成详细设计」）。 */
     stepHint?: StepHint | null
     /** 引导条上「进入下一环节」按钮的回调。 */
     onHintAction?: () => void
-    /** 引导用户点击的快捷指令 label，对应卡片高亮。 */
-    highlightCommand?: string
     /** Agent 运行中的「真中止」：调用后端中止接口并杀掉 CLI 子进程树。 */
     onAbort?: () => void
     /** 中止请求进行中（按钮转圈，防连点）。 */
@@ -67,17 +72,65 @@ const RequirementPane = forwardRef<
   streamText = '',
   statusText = '',
   onSend,
+  sid,
+  pid,
+  token,
   quickCommands,
   stepHint,
   onHintAction,
-  highlightCommand,
   onAbort,
   aborting = false,
 }, ref) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const chatRef = useRef<ChatPanelHandle>(null)
-  // 常用指令条默认展开，用户可收起（避免长指令占用输入区上方空间）
-  const [qcOpen, setQcOpen] = useState(true)
+  // 历史消息文件预览：点击附件 chip 打开
+  const [preview, setPreview] = useState<{ path: string; ext: string; content: string; name: string } | null>(null)
+
+  const uploadFiles = sid
+    ? async (files: File[]): Promise<ChatAttachment[]> => {
+        const rows = await uploadSessionAttachments(token ?? null, sid, files)
+        return rows.map((r) => ({ path: r.path, filename: r.filename, size: r.size }))
+      }
+    : undefined
+
+  const openPreview = async (a: ChatAttachment) => {
+    if (pid == null) return
+    const ext = extOf(a.filename)
+    const kind = previewKindOf(ext)
+    const binaryPreview =
+      kind === 'pdf' || kind === 'image' || kind === 'sheet' || kind === 'docx' || kind === 'office-legacy'
+    let content = ''
+    if (!binaryPreview) {
+      try {
+        content = (await readFile(token ?? null, pid, a.path)).content
+      } catch {
+        /* 读不到内容时仍打开预览（二进制预览器自行拉取，文本类给下载兜底） */
+      }
+    }
+    setPreview({ path: a.path, ext, content, name: a.filename })
+  }
+
+  /** 文件 chip 列表（历史消息 / 预览入口）。 */
+  const FileChips = ({ files }: { files: ChatAttachment[] }) => (
+    <div className="msg-atts">
+      {files.map((a) => {
+        const isImg = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(extOf(a.filename))
+        return (
+          <button
+            key={a.path}
+            type="button"
+            className="msg-att"
+            title={pid == null ? a.path : `点击预览 · ${a.path}`}
+            disabled={pid == null}
+            onClick={() => void openPreview(a)}
+          >
+            {isImg ? <FileImageOutlined /> : <FileOutlined />}
+            <span className="msg-att-name">{a.filename}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
 
   useImperativeHandle(ref, () => ({
     loadDraft: (text: string) => {
@@ -115,7 +168,19 @@ const RequirementPane = forwardRef<
                   }
                 />
                 <div className={`bubble ${isUser ? 'bubble-me' : 'bubble-agent'}`}>
-                  {isUser ? <RichText text={m.content} /> : <AgentMarkdown text={m.content} />}
+                  {isUser ? (
+                    (() => {
+                      const { text, files } = parseMessage(m.content)
+                      return (
+                        <>
+                          {text && <RichText text={text} />}
+                          {files.length > 0 && <FileChips files={files} />}
+                        </>
+                      )
+                    })()
+                  ) : (
+                    <AgentMarkdown text={m.content} />
+                  )}
                 </div>
               </div>
             )
@@ -164,37 +229,37 @@ const RequirementPane = forwardRef<
         </div>
       )}
 
-      {quickCommands && quickCommands.length > 0 && (
-        <div className={`quick-commands${qcOpen ? '' : ' is-closed'}`}>
-          <button type="button" className="qc-head qc-head-btn" onClick={() => setQcOpen((o) => !o)}>
-            <span className="qc-head-icon">
-              <ThunderboltOutlined />
-            </span>
-            <span className="qc-head-title">常用指令</span>
-            <span className="qc-head-hint">点一下填入输入框，确认无误后手动发送</span>
-            <DownOutlined className="qc-head-caret" />
-          </button>
-          {qcOpen && (
-            <div className="qc-list">
-              {quickCommands.map((c) => (
-                <button
-                  key={c.label}
-                  type="button"
-                  className={`qc-chip${highlightCommand === c.label ? ' is-highlight' : ''}`}
-                  disabled={busy}
-                  title={c.text}
-                  onClick={() => chatRef.current?.setDraft(c.text)}
-                >
-                  <span className="qc-chip-title">{c.label}</span>
-                  {c.desc && <span className="qc-chip-desc">{c.desc}</span>}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <ChatPanel
+        ref={chatRef}
+        busy={busy}
+        onSend={onSend}
+        commands={quickCommands}
+        onUpload={uploadFiles}
+        onAbort={onAbort}
+        aborting={aborting}
+      />
 
-      <ChatPanel ref={chatRef} busy={busy} onSend={onSend} onAbort={onAbort} aborting={aborting} />
+      <Modal
+        title={preview?.name}
+        open={!!preview}
+        onCancel={() => setPreview(null)}
+        footer={<a onClick={() => setPreview(null)}>关闭</a>}
+        width={860}
+        destroyOnHidden
+      >
+        {preview && pid != null && (
+          <div className="fv-stage">
+            {hasPreviewMode(preview.ext) ? (
+              <FilePreview pid={pid} token={token ?? null} path={preview.path} ext={preview.ext} content={preview.content} />
+            ) : (
+              // 纯文本 / 未知类型没有专门预览器：直接把内容铺在等宽块里
+              <pre className="code-block" style={{ maxHeight: '58vh' }}>
+                {preview.content || '（空文件或内容不可预览）'}
+              </pre>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   )
 })

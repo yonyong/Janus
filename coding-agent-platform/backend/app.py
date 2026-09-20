@@ -23,6 +23,7 @@ from . import docs as WD
 from . import files as FS
 from . import snapshots as SN
 from . import test_report as TR
+from . import acceptance as ACC
 from .models import (AgentCreate, AgentUpdate, AgentReorderIn, AgentTestIn, ProjectCreate,
                      ProjectUpdate,
                      RequirementCreate,
@@ -885,7 +886,8 @@ def create_case(rid: int, body: CaseIn, allowed: set = Depends(get_allowed),
     if not title:
         raise HTTPException(status_code=400, detail="用例标题不能为空")
     out = R.TestCaseRepo.create(db, rid, title[:200], body.steps, body.expected,
-                                _valid_status(body.status), body.note, body.source or "manual")
+                                _valid_status(body.status), body.note, body.source or "manual",
+                                is_manual=1 if body.is_manual else 0)
     _export_test_cases(db, rid)
     return out
 
@@ -899,7 +901,8 @@ def bulk_create_cases(rid: int, body: CaseBulkIn, allowed: set = Depends(get_all
     for c in body.cases:
         if (c.title or "").strip():
             items.append({"title": c.title.strip(), "steps": c.steps, "expected": c.expected,
-                          "status": c.status, "note": c.note, "source": c.source or "ai"})
+                          "status": c.status, "note": c.note, "source": c.source or "ai",
+                          "is_manual": bool(c.is_manual)})
     created = R.TestCaseRepo.create_many(db, rid, items, source="ai")
     _export_test_cases(db, rid)
     return {"created": len(created), "cases": created}
@@ -959,6 +962,7 @@ def update_case(cid: int, body: CaseUpdate, allowed: set = Depends(get_allowed),
         expected=body.expected if body.expected is not None else R.UNSET,
         status=_valid_status(body.status) if body.status is not None else R.UNSET,
         note=body.note if body.note is not None else R.UNSET,
+        is_manual=body.is_manual if body.is_manual is not None else R.UNSET,
     )
     _export_test_cases(db, out["requirement_id"])
     return out
@@ -985,6 +989,65 @@ def sync_test_result(rid: int, allowed: set = Depends(get_allowed),
                   project_name=(proj or {}).get("name") or "",
                   detail={"updated": out["updated"], "rows": out["rows"]})
     return out
+
+
+def _accept_coverage(db, rid, proj, dir_name) -> dict:
+    """按最近一次测试报告的「标题」列判定覆盖度：报告里出现过的标题算「已进脚本」，
+    非人工且未出现的算「未覆盖」。报告缺失 / 无标题列时覆盖度未知（不判未覆盖）。"""
+    content = TR.read_report(proj["disk_path"], dir_name) if dir_name else None
+    titles = TR.report_titles(content) if content else set()
+    cases = R.TestCaseRepo.list_by_requirement(db, rid)
+    covered, uncovered = [], []
+    known = bool(titles)
+    for c in cases:
+        if c.get("is_manual"):
+            continue
+        if known and c["title"] in titles:
+            covered.append(c["id"])
+        elif known:
+            uncovered.append(c["id"])
+    return {"known": known, "covered_ids": covered, "uncovered_ids": uncovered,
+            "uncovered": len(uncovered)}
+
+
+@app.get("/api/requirements/{rid}/accept-script")
+def accept_script_status(rid: int, allowed: set = Depends(get_allowed),
+                         db: sqlite3.Connection = Depends(get_db)):
+    """总验收脚本状态：是否存在、路径、mtime、是否过期、入口语言，附覆盖度。"""
+    req = _require_requirement(db, rid, allowed)
+    proj = _require_project(db, req["project_id"])
+    d = req.get("dir_name") or ""
+    cases = R.TestCaseRepo.list_by_requirement(db, rid)
+    status = ACC.script_status(cases, proj["disk_path"], d)
+    status["coverage"] = _accept_coverage(db, rid, proj, d)
+    return status
+
+
+@app.post("/api/requirements/{rid}/accept-script/run")
+def accept_script_run(rid: int, allowed: set = Depends(get_allowed),
+                      db: sqlite3.Connection = Depends(get_db)):
+    """执行总验收脚本 → 解析工作区测试报告回写用例状态。
+
+    验收主路径不依赖 AI：直接在项目工作区跑 accept.*，脚本自己写 test-result.md，
+    平台随后 sync 回红绿。脚本不存在时返回 ran=False + reason=no_script，前端引导先生成。
+    """
+    req = _require_requirement(db, rid, allowed)
+    proj = _require_project(db, req["project_id"])
+    d = req.get("dir_name") or ""
+    result = ACC.run_script(proj["disk_path"], d)
+    if not result.get("ran"):
+        audit.log("requirement.accept_run", status="failure", target_type="requirement",
+                  target_id=rid, target_name=req["title"], project_id=req["project_id"],
+                  project_name=(proj or {}).get("name") or "",
+                  error=result.get("reason") or "run_failed")
+        return {**result, "sync": None}
+    sync = TR.sync_cases(db, rid, proj["disk_path"], d)
+    audit.log("requirement.accept_run", target_type="requirement", target_id=rid,
+              target_name=req["title"], project_id=req["project_id"],
+              project_name=(proj or {}).get("name") or "",
+              detail={"entry": result.get("entry"), "exit_code": result.get("exit_code"),
+                      "updated": sync.get("updated"), "rows": sync.get("rows")})
+    return {**result, "sync": sync}
 
 
 @app.delete("/api/cases/{cid}")
@@ -1461,6 +1524,45 @@ def session_history(sid: int, db: sqlite3.Connection = Depends(get_db), token: s
     if sess["project_id"] not in allowed:
         raise HTTPException(status_code=403, detail="无权访问该项目")
     return R.MessageRepo.list_by_session(db, sid)
+
+
+@app.post("/api/sessions/{sid}/attachments")
+def upload_session_attachments(sid: int, files: list[UploadFile] = File(...),
+                               db: sqlite3.Connection = Depends(get_db),
+                               token: str = Query(None), admin: str = Query(None)):
+    """对话输入框粘贴/选择的文件：存到 .janus/{需求目录}/chat/attach/，返回项目内相对路径。
+
+    不落 DB：路径随消息文本一并发出（消息里带 [[janus:files]] 引用），既能被 Agent
+    直接读取，也能在历史消息里点开预览。鉴权与其他会话接口一致（令牌/管理员）。
+    """
+    allowed = resolve_access(db, token, admin)
+    if allowed is None:
+        raise HTTPException(status_code=401, detail="无效或缺失访问令牌")
+    sess = R.SessionRepo.get(db, sid)
+    if sess is None:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    if sess["project_id"] not in allowed:
+        raise HTTPException(status_code=403, detail="无权访问该项目")
+    proj = _require_project(db, sess["project_id"])
+    req = R.RequirementRepo.get(db, sess["requirement_id"])
+    d = (req or {}).get("dir_name") or WD.sanitize_dir_name((req or {}).get("title") or "")
+    out: list[dict] = []
+    for f in files:
+        if f is None:
+            continue
+        filename = f.filename or "attachment"
+        data = f.file.read()
+        try:
+            rel = WD.save_attachment(proj["disk_path"], WD.chat_attach_subdir(d), filename, data)
+        except FS.FsError as e:
+            raise HTTPException(status_code=getattr(e, "code", 400) or 400, detail=str(e))
+        out.append({"path": rel, "filename": filename, "size": len(data)})
+    if out:
+        audit.log("session.attach", target_type="session", target_id=sid,
+                  target_name=(req or {}).get("title") or "", project_id=sess["project_id"],
+                  project_name=(proj or {}).get("name") or "",
+                  detail={"count": len(out), "names": [r["filename"] for r in out][:10]})
+    return out
 
 
 @app.get("/api/sessions/{sid}/events")

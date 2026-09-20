@@ -120,10 +120,14 @@ export default function FileWorkArea({
           <CasePane
             token={token}
             rid={rid}
+            dir={requirement?.dir_name || ''}
             cases={cases}
             loading={casesLoading}
             onReload={onReloadCases}
             onAskAgent={onAskAgent}
+            onUseCommand={onUseCommand}
+            onOpenFiles={() => onCatChange('code')}
+            refreshSignal={refreshSignal}
           />
         )}
 
