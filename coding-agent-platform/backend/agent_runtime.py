@@ -20,7 +20,16 @@ class AgentEvent:
 
 @runtime_checkable
 class CodingAgentProvider(Protocol):
-    async def invoke(self, session, message: str, project_path: str) -> AsyncIterator[AgentEvent]:
+    async def invoke(
+        self, session, message: str, project_path: str, resume_id: str | None = None
+    ) -> AsyncIterator[AgentEvent]:
+        """执行一次 agent 运行并产出事件流。
+
+        resume_id 为该平台会话上底层 CLI 首轮返回的外部会话 id：非空时适配器应以
+        ``--resume``（或等价子命令）续聊，而不是重新开一个会话。适配器发现新的外部
+        会话 id 时，应产出 ``AgentEvent(type="session", payload={"cli_session_id": id})``，
+        由 session_service 持久化到 sessions 表。
+        """
         ...
 
 

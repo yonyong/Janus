@@ -37,6 +37,7 @@ import {
   MoreOutlined,
   ReloadOutlined,
   SaveOutlined,
+  SearchOutlined,
   UndoOutlined,
 } from '@ant-design/icons'
 import {
@@ -147,6 +148,8 @@ export default function FilePane({
   const [nameInput, setNameInput] = useState('')
   const [nameErr, setNameErr] = useState<string | null>(null)
   const [nameBusy, setNameBusy] = useState(false)
+  // 文件名检索（item 4）：在已加载目录中按文件名过滤，命中项以扁平列表展示
+  const [query, setQuery] = useState('')
   const inflight = useRef<Set<string>>(new Set())
   const bootSeq = useRef(0)
 
@@ -473,6 +476,37 @@ export default function FilePane({
 
   const treeData = pid === null ? [] : buildNodes(ROOT)
 
+  // 检索：在所有已加载目录里按文件名（不区分大小写）过滤，命中项扁平展示
+  const q = query.trim().toLowerCase()
+  const searching = q.length > 0
+  const matches: FileEntry[] = []
+  if (searching) {
+    const seen = new Set<string>()
+    for (const list of Object.values(childrenOf)) {
+      for (const e of list) {
+        if (hideIgnored && IGNORE.has(e.name)) continue
+        if (seen.has(e.path)) continue
+        if (e.name.toLowerCase().includes(q)) {
+          seen.add(e.path)
+          matches.push(e)
+        }
+      }
+    }
+    matches.sort((a, b) =>
+      a.type === b.type ? a.path.localeCompare(b.path) : a.type === 'dir' ? -1 : 1,
+    )
+  }
+
+  const openSearchHit = (e: FileEntry) => {
+    if (e.type === 'dir') {
+      setQuery('')
+      setSelected(e.path)
+      expandDir(e.path)
+    } else {
+      void openFile(e)
+    }
+  }
+
   const sel = selected ? index[selected] : undefined
   const targetDir = sel ? (sel.type === 'dir' ? sel.path : parentOf(sel.path)) : ROOT
   const dirty = !!editor && editor.content !== editor.original
@@ -546,6 +580,17 @@ export default function FilePane({
         )}
       </div>
 
+      <div className="fp-search">
+        <Input
+          size="small"
+          allowClear
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          prefix={<SearchOutlined style={{ color: '#8f959e' }} />}
+          placeholder="按文件名检索（已加载目录）"
+        />
+      </div>
+
       <div className="fp-path">
         <FolderOpenOutlined style={{ color: '#ffb020' }} />
         <span className="fp-path-label">新建位置</span>
@@ -575,6 +620,37 @@ export default function FilePane({
         />
       )}
 
+      {searching ? (
+        <div className="fp-tree fp-results">
+          {matches.length === 0 ? (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="已加载目录中未找到匹配文件"
+              style={{ marginTop: 40 }}
+            />
+          ) : (
+            <>
+              <div className="fp-results-hint">
+                共 {matches.length} 项匹配 · 仅检索已加载目录，展开更多目录可纳入检索
+              </div>
+              {matches.map((e) => (
+                <button
+                  key={e.path}
+                  type="button"
+                  className="fp-result"
+                  title={e.path}
+                  onClick={() => openSearchHit(e)}
+                >
+                  <span className="fp-icon">{fileIcon(e)}</span>
+                  <span className="fp-result-name">{e.name}</span>
+                  <span className="fp-result-path">{parentOf(e.path) || '根目录'}</span>
+                  {e.type !== 'dir' && <span className="fp-meta">{fmtSize(e.size)}</span>}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+      ) : (
       <div className="fp-tree">
         {booting && treeData.length === 0 ? (
           <div style={{ padding: '8px 10px' }}>
@@ -605,6 +681,7 @@ export default function FilePane({
           />
         )}
       </div>
+      )}
 
       {diskPath && (
         <div className="fp-foot">

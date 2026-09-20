@@ -32,10 +32,10 @@ import {
   streamEvents,
 } from '../api'
 import type { RequirementPaneHandle } from '../components/RequirementPane'
+import ThemeSwitcher from '../components/ThemeSwitcher'
 import { buildFlowCommands, verifyCasesPrompt } from '../components/FlowCommands'
-import type { FlowCommand } from '../components/FlowCommands'
-import FlowCommands from '../components/FlowCommands'
-import FileWorkArea from '../components/FileWorkArea'
+import FileWorkArea, { STAGE_CAT } from '../components/FileWorkArea'
+import type { Cat } from '../components/FileWorkArea'
 import RequirementPane from '../components/RequirementPane'
 
 /**
@@ -62,6 +62,8 @@ export default function Workbench() {
   const [cases, setCases] = useState<TestCase[]>([])
   const [casesLoading, setCasesLoading] = useState(false)
   const [stage, setStage] = useState<Stage>('clarify')
+  // 左栏分类（受控）：阶段变化时联动默认分类，快捷键 Alt+1~5 也能直接切换
+  const [cat, setCat] = useState<Cat>('req')
   const [conv, setConv] = useState<{ role: string; content: string }[]>([])
   // 流式输出：一次运行中 Agent 的全部输出（各轮流式正文 + 最终答复）都汇总进
   // 同一条气泡（streamText 实时追加），done 时整体转正为一条对话消息；
@@ -197,6 +199,11 @@ export default function Workbench() {
     void loadFlow()
     void loadCases(true)
   }, [rid, loadFlow, loadCases])
+
+  // 阶段变化时联动左栏默认分类（点流程/切阶段时左栏跟着走；手动切分类不回写阶段）
+  useEffect(() => {
+    setCat(STAGE_CAT[stage])
+  }, [stage])
 
   // ---------------- 步骤引导 ----------------
 
@@ -443,12 +450,23 @@ export default function Workbench() {
     if (Number.isFinite(target)) gotoSession(target)
   }
 
-  /** 点击流程指令：切到对应阶段上下文 + 把话术灌入输入框（归档指令只切阶段）。 */
-  const useCommand = (cmd: FlowCommand) => {
-    if (busy) return
+  // 常用指令：供对话输入框上方常驻展示，点选填入输入框（item 13）。
+  // 归档指令 text 为空（只切阶段），这里过滤掉，只留可发送的话术。
+  const composerCommands = useMemo(
+    () =>
+      buildFlowCommands(requirement?.dir_name || '')
+        .filter((c) => c.text)
+        .map((c) => ({ label: c.label, desc: c.desc, text: c.text })),
+    [requirement?.dir_name],
+  )
+
+  /** 帮助面板 / 输入框常用指令点选：切到对应阶段上下文 + 把话术灌入输入框。 */
+  const onUseCommand = (text: string) => {
+    if (busy || !text) return
     setStepHint(null)
-    if (cmd.stage !== stage) void changeStage(cmd.stage)
-    if (cmd.text) paneRef.current?.loadDraft(cmd.text)
+    const cmd = buildFlowCommands(requirement?.dir_name || '').find((c) => c.text === text)
+    if (cmd && cmd.stage !== stage) void changeStage(cmd.stage)
+    paneRef.current?.loadDraft(text)
   }
 
   const title = requirement?.title || info?.requirement?.title || `会话 #${sid}`
@@ -473,6 +491,39 @@ export default function Workbench() {
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
     }
+  }, [])
+
+  // ---------------- 快捷键（item 7 / 11：统一走 Alt 组合，避开浏览器占用） ----------------
+  // 用 ref 持有最新回调，effect 只注册一次，避免闭包捕获旧状态。
+  const hotkeyRef = useRef<() => (e: KeyboardEvent) => void>(() => () => {})
+  hotkeyRef.current = () => (e: KeyboardEvent) => {
+    if (!e.altKey || e.ctrlKey || e.metaKey) return
+    const actions: Record<string, () => void> = {
+      '1': () => setCat('req'),
+      '2': () => setCat('cases'),
+      '3': () => setCat('arch'),
+      '4': () => setCat('code'),
+      '5': () => setCat('help'),
+      b: () => {
+        setLeftCollapsed((v) => !v)
+        setLeftPx(null)
+      },
+      n: () => void createNewSession(),
+      i: () => paneRef.current?.focus(),
+      '.': () => {
+        if (busy) void abortRun()
+      },
+    }
+    const fn = actions[e.key.toLowerCase()]
+    if (fn) {
+      e.preventDefault()
+      fn()
+    }
+  }
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => hotkeyRef.current()(e)
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
   }, [])
 
   return (
@@ -529,6 +580,7 @@ export default function Workbench() {
           >
             {busy ? 'Agent 运行中' : '空闲'}
           </Tag>
+          <ThemeSwitcher />
         </Space>
       </div>
 
@@ -562,7 +614,8 @@ export default function Workbench() {
             token={token}
             pid={pid}
             rid={rid}
-            stage={stage}
+            cat={cat}
+            onCatChange={setCat}
             requirement={requirement}
             flow={flow}
             cases={cases}
@@ -570,6 +623,8 @@ export default function Workbench() {
             diskPath={info?.disk_path ?? undefined}
             sessionId={sessionId}
             refreshSignal={fsSignal}
+            busy={busy}
+            onUseCommand={onUseCommand}
             onDocSaved={(r) => {
               setRequirement(r)
               void loadFlow(true)
@@ -592,13 +647,6 @@ export default function Workbench() {
         </section>
 
         <section className="wb-right">
-          <FlowCommands
-            stage={stage}
-            flow={flow}
-            dir={requirement?.dir_name || ''}
-            busy={busy}
-            onUse={useCommand}
-          />
           <RequirementPane
             ref={paneRef}
             messages={conv}
@@ -606,6 +654,7 @@ export default function Workbench() {
             streamText={streamText}
             statusText={statusText}
             onSend={send}
+            quickCommands={composerCommands}
             stepHint={stepHint}
             onAbort={() => void abortRun()}
             aborting={aborting}
