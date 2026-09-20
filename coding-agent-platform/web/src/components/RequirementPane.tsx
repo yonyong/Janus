@@ -1,12 +1,21 @@
-import { forwardRef, useImperativeHandle, useRef, useEffect } from 'react'
+import { forwardRef, useImperativeHandle, useRef, useEffect, useState } from 'react'
 import { Avatar, Empty, Space, Spin, Typography } from 'antd'
-import { ArrowRightOutlined, BulbOutlined, RobotOutlined, ThunderboltOutlined, UserOutlined } from '@ant-design/icons'
+import {
+  ArrowRightOutlined,
+  BulbOutlined,
+  DownOutlined,
+  RobotOutlined,
+  ThunderboltOutlined,
+  UserOutlined,
+} from '@ant-design/icons'
 import ChatPanel, { type ChatPanelHandle } from './ChatPanel'
 import RichText from './RichText'
+import AgentMarkdown from './AgentMarkdown'
 
 /** 供父组件（如 Workbench）把快捷指令文本灌入输入框，不自动发送。 */
 export interface RequirementPaneHandle {
   loadDraft: (text: string) => void
+  focus: () => void
 }
 
 export interface ChatMessage {
@@ -67,11 +76,14 @@ const RequirementPane = forwardRef<
 }, ref) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const chatRef = useRef<ChatPanelHandle>(null)
+  // 常用指令条默认展开，用户可收起（避免长指令占用输入区上方空间）
+  const [qcOpen, setQcOpen] = useState(true)
 
   useImperativeHandle(ref, () => ({
     loadDraft: (text: string) => {
       chatRef.current?.setDraft(text)
     },
+    focus: () => chatRef.current?.focus(),
   }))
 
   useEffect(() => {
@@ -103,7 +115,7 @@ const RequirementPane = forwardRef<
                   }
                 />
                 <div className={`bubble ${isUser ? 'bubble-me' : 'bubble-agent'}`}>
-                  <RichText text={m.content} />
+                  {isUser ? <RichText text={m.content} /> : <AgentMarkdown text={m.content} />}
                 </div>
               </div>
             )
@@ -115,7 +127,7 @@ const RequirementPane = forwardRef<
             <div className="bubble bubble-agent">
               {streamText ? (
                 <>
-                  <RichText text={streamText} />
+                  <AgentMarkdown text={streamText} />
                   {busy && <span className="stream-caret" aria-hidden />}
                   {busy && statusText && (
                     <div className="stream-status">
@@ -153,29 +165,32 @@ const RequirementPane = forwardRef<
       )}
 
       {quickCommands && quickCommands.length > 0 && (
-        <div className="quick-commands">
-          <div className="qc-head">
+        <div className={`quick-commands${qcOpen ? '' : ' is-closed'}`}>
+          <button type="button" className="qc-head qc-head-btn" onClick={() => setQcOpen((o) => !o)}>
             <span className="qc-head-icon">
               <ThunderboltOutlined />
             </span>
-            <span className="qc-head-title">快捷指令</span>
+            <span className="qc-head-title">常用指令</span>
             <span className="qc-head-hint">点一下填入输入框，确认无误后手动发送</span>
-          </div>
-          <div className="qc-list">
-            {quickCommands.map((c) => (
-              <button
-                key={c.label}
-                type="button"
-                className={`qc-chip${highlightCommand === c.label ? ' is-highlight' : ''}`}
-                disabled={busy}
-                title={c.text}
-                onClick={() => chatRef.current?.setDraft(c.text)}
-              >
-                <span className="qc-chip-title">{c.label}</span>
-                {c.desc && <span className="qc-chip-desc">{c.desc}</span>}
-              </button>
-            ))}
-          </div>
+            <DownOutlined className="qc-head-caret" />
+          </button>
+          {qcOpen && (
+            <div className="qc-list">
+              {quickCommands.map((c) => (
+                <button
+                  key={c.label}
+                  type="button"
+                  className={`qc-chip${highlightCommand === c.label ? ' is-highlight' : ''}`}
+                  disabled={busy}
+                  title={c.text}
+                  onClick={() => chatRef.current?.setDraft(c.text)}
+                >
+                  <span className="qc-chip-title">{c.label}</span>
+                  {c.desc && <span className="qc-chip-desc">{c.desc}</span>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

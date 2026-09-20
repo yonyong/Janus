@@ -63,7 +63,7 @@ const ChatPanel = forwardRef<
             send()
           }
         }}
-        style={{ borderRadius: 10, background: '#fff' }}
+        style={{ borderRadius: 10 }}
       />
       <div
         style={{

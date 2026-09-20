@@ -32,7 +32,9 @@ import {
 } from '@ant-design/icons'
 import { useAuth } from './auth'
 import { SearchContext } from './context'
-import { feishuTheme, brandGradient } from './theme'
+import { brandGradient } from './theme'
+import { ThemeProvider, buildAntdTheme, useThemeMode } from './themeContext'
+import ThemeSwitcher from './components/ThemeSwitcher'
 import AuthProvider from './components/AuthProvider'
 import AuthLoginModal from './components/AuthLoginModal'
 import BrandMark from './components/BrandMark'
@@ -118,6 +120,7 @@ function LockedPlaceholder() {
 
 function Shell() {
   const { ready, authorized, isAdmin, token, openLogin, logout } = useAuth()
+  const { isDark } = useThemeMode()
   const location = useLocation()
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(false)
@@ -223,15 +226,15 @@ function Shell() {
           collapsible
           collapsed={collapsed}
           trigger={null}
-          theme="light"
+          theme={isDark ? 'dark' : 'light'}
           // 窄屏（<992px）自动折叠成图标栏：不依赖用户手动点「收起侧边栏」
           breakpoint="lg"
           onBreakpoint={(broken) => setCollapsed(broken)}
           style={{
-            borderRight: '1px solid #eff0f3',
+            borderRight: '1px solid var(--border)',
             display: 'flex',
             flexDirection: 'column',
-            background: 'linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%)',
+            background: 'var(--sider-bg)',
           }}
         >
           <div
@@ -321,7 +324,7 @@ function Shell() {
               // 关键：antd Header 默认 line-height = 高度，多行内容会溢出顶栏；
               // 这里恢复正常行高，并从结构上改为单行面包屑，彻底消除与内容区交叉的问题。
               lineHeight: 'normal',
-              background: 'rgba(255, 255, 255, 0.82)',
+              background: 'var(--header-bg)',
               backdropFilter: 'blur(10px)',
               boxShadow: '0 1px 6px rgba(31, 35, 41, 0.04)',
             }}
@@ -354,6 +357,7 @@ function Shell() {
             <div style={{ flex: 1 }} />
 
             <Space size={12}>
+              <ThemeSwitcher />
               {/* 身份 Tag 只做状态展示；切换/退出收进头像下拉，避免「可点击的 Tag」这种非常规交互 */}
               <Tag
                 color={isAdmin ? 'purple' : token ? 'success' : 'error'}
@@ -405,9 +409,10 @@ function Shell() {
   )
 }
 
-export default function App() {
+function ThemedApp() {
+  const { mode } = useThemeMode()
   return (
-    <ConfigProvider locale={zhCN} theme={feishuTheme}>
+    <ConfigProvider locale={zhCN} theme={buildAntdTheme(mode)}>
       <AntdApp>
         <AuthProvider>
           <HashRouter>
@@ -418,5 +423,13 @@ export default function App() {
         </AuthProvider>
       </AntdApp>
     </ConfigProvider>
+  )
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <ThemedApp />
+    </ThemeProvider>
   )
 }
