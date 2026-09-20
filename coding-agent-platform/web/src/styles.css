@@ -2455,6 +2455,66 @@ body.wb-dragging .wb-split::after {
   background: var(--bg-elevated);
 }
 
+/* 斜杠指令菜单（输入 / 唤起，一行一个） */
+.slash-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+  padding: 6px;
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-md);
+}
+
+.slash-menu-head {
+  padding: 2px 8px 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-4);
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 2px;
+}
+
+/* 一行一个：整行块级按钮，标题 + 说明同一行左对齐 */
+.slash-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.slash-item:hover,
+.slash-item.is-active {
+  background: var(--tint-primary);
+}
+
+.slash-item-name {
+  flex: none;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.slash-item-desc {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--text-4);
+}
+
 /* 待发送附件 chip（输入框上方） */
 .composer-atts {
   display: flex;

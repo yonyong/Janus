@@ -270,6 +270,7 @@ const RequirementPane = forwardRef<
         ref={chatRef}
         busy={busy}
         onSend={onSend}
+        commands={quickCommands}
         onUpload={uploadFiles}
         onAbort={onAbort}
         aborting={aborting}

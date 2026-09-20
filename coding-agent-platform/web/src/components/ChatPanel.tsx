@@ -17,6 +17,13 @@ export interface ChatPanelHandle {
   focus: () => void
 }
 
+/** 斜杠菜单里的一条常用指令。 */
+export interface SlashCommand {
+  label: string
+  desc?: string
+  text: string
+}
+
 const IMG_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'])
 
 /** 对话输入区：Enter 发送、Shift+Enter 换行；支持 Ctrl+V 粘贴文件 / 点击回形针选择文件，
@@ -28,6 +35,8 @@ const ChatPanel = forwardRef<
     busy: boolean
     onSend: (text: string) => void
     placeholder?: string
+    /** 常用指令：输入 `/` 时在输入框上方唤起一行一个的选择菜单。 */
+    commands?: SlashCommand[]
     /** 上传粘贴/选择的文件，返回落盘后的附件（含项目内相对路径）。 */
     onUpload?: (files: File[]) => Promise<ChatAttachment[]>
     /** Agent 运行中可点「停止」：调用后端中止接口，杀掉 CLI 子进程树（真中止）。 */
@@ -36,15 +45,59 @@ const ChatPanel = forwardRef<
     aborting?: boolean
   }
 >(function ChatPanel(
-  { busy, onSend, placeholder = '描述需求，召唤编码 Agent…（可 Ctrl+V 粘贴文件）', onUpload, onAbort, aborting = false },
+  {
+    busy,
+    onSend,
+    placeholder = '描述需求，召唤编码 Agent…（输入 / 唤起常用指令，可 Ctrl+V 粘贴文件）',
+    commands = [],
+    onUpload,
+    onAbort,
+    aborting = false,
+  },
   ref,
 ) {
   const { message } = AntdApp.useApp()
   const [v, setV] = useState('')
   const [atts, setAtts] = useState<ChatAttachment[]>([])
   const [uploading, setUploading] = useState(false)
+  // 斜杠菜单：输入以 / 开头时唤起；menuIdx 为高亮项，dismissed 记录用户按 Esc 主动关闭
+  const [menuIdx, setMenuIdx] = useState(0)
+  const [slashDismissed, setSlashDismissed] = useState(false)
   const taRef = useRef<React.ComponentRef<typeof Input.TextArea> | null>(null)
   const fileRef = useRef<HTMLInputElement | null>(null)
+
+  // 以 / 开头 → 取 / 后的关键词过滤常用指令（匹配标题或说明）
+  const slashQuery = v.startsWith('/') ? v.slice(1).trim().toLowerCase() : null
+  const slashFiltered =
+    slashQuery !== null && !busy
+      ? commands.filter(
+          (c) =>
+            !slashQuery ||
+            c.label.toLowerCase().includes(slashQuery) ||
+            (c.desc || '').toLowerCase().includes(slashQuery),
+        )
+      : []
+  const menuOpen = !slashDismissed && slashFiltered.length > 0
+  const activeIdx = Math.min(menuIdx, Math.max(0, slashFiltered.length - 1))
+
+  const pickCommand = (c: SlashCommand) => {
+    setSlashDismissed(true)
+    setMenuIdx(0)
+    setV(c.text)
+    window.setTimeout(() => {
+      const el = taRef.current?.nativeElement as HTMLTextAreaElement | null | undefined
+      if (!el) return
+      el.focus()
+      el.setSelectionRange(el.value.length, el.value.length)
+    }, 0)
+  }
+
+  const onChangeValue = (next: string) => {
+    setV(next)
+    // 值不再以 / 开头时清掉「已关闭」标记，下次再输入 / 能重新唤起
+    if (!next.startsWith('/')) setSlashDismissed(false)
+    setMenuIdx(0)
+  }
 
   useImperativeHandle(ref, () => ({
     setDraft: (text: string) => {
@@ -138,15 +191,64 @@ const ChatPanel = forwardRef<
           })}
         </div>
       )}
+      {menuOpen && (
+        <div className="slash-menu" role="listbox">
+          <div className="slash-menu-head">常用指令 · ↑↓ 选择 · Enter 填入 · Esc 关闭</div>
+          {slashFiltered.map((c, i) => (
+            <button
+              key={c.label}
+              type="button"
+              role="option"
+              aria-selected={i === activeIdx}
+              className={`slash-item${i === activeIdx ? ' is-active' : ''}`}
+              onMouseEnter={() => setMenuIdx(i)}
+              onClick={() => pickCommand(c)}
+            >
+              <span className="slash-item-name">{c.label}</span>
+              {c.desc && <span className="slash-item-desc">{c.desc}</span>}
+            </button>
+          ))}
+        </div>
+      )}
       <Input.TextArea
         ref={taRef}
         value={v}
         disabled={busy}
         autoSize={{ minRows: 2, maxRows: 6 }}
         placeholder={busy ? 'Agent 正在处理…' : placeholder}
-        onChange={(e) => setV(e.target.value)}
+        onChange={(e) => onChangeValue(e.target.value)}
         onPaste={onPaste}
         onKeyDown={(e) => {
+          if (menuOpen) {
+            if (e.key === 'ArrowDown') {
+              e.preventDefault()
+              setMenuIdx((i) => (Math.min(i, slashFiltered.length - 1) + 1) % slashFiltered.length)
+              return
+            }
+            if (e.key === 'ArrowUp') {
+              e.preventDefault()
+              setMenuIdx((i) => {
+                const cur = Math.min(i, slashFiltered.length - 1)
+                return (cur - 1 + slashFiltered.length) % slashFiltered.length
+              })
+              return
+            }
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              pickCommand(slashFiltered[activeIdx])
+              return
+            }
+            if (e.key === 'Tab') {
+              e.preventDefault()
+              pickCommand(slashFiltered[activeIdx])
+              return
+            }
+            if (e.key === 'Escape') {
+              e.preventDefault()
+              setSlashDismissed(true)
+              return
+            }
+          }
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
             send()
@@ -174,7 +276,7 @@ const ChatPanel = forwardRef<
             />
           </Tooltip>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {uploading ? '正在上传…' : 'Enter 发送 · Shift + Enter 换行'}
+            {uploading ? '正在上传…' : 'Enter 发送 · Shift + Enter 换行 · / 唤起指令'}
           </Typography.Text>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
