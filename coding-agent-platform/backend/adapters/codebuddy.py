@@ -325,10 +325,13 @@ _CLI_SPECS = {
     "codex": {"cmd": "codex", "base_flags": ("exec", "--full-auto", "--skip-git-repo-check"),
               "model_flag": "--model", "trust": False, "stream_flags": (),
               "api_key_env": "OPENAI_API_KEY"},
-    # cursor：cursor-agent 的非交互打印模式
-    "cursor": {"cmd": "cursor-agent", "base_flags": ("-p",),
+    # cursor：cursor-agent 的非交互打印模式；--trust 跳过 Workspace Trust 交互确认
+    # （平台在临时目录里跑 agent，没人能在终端里答 trust 询问，不加会直接失败）；
+    # json_result 开启后自动追加 --output-format json，结束时的单对象 result 带
+    # 真实 usage（camelCase 键名，normalize_usage 已兼容），用量留痕不再靠估算
+    "cursor": {"cmd": "cursor-agent", "base_flags": ("-p", "--trust"),
                "model_flag": "--model", "trust": False, "stream_flags": (),
-               "api_key_env": "CURSOR_API_KEY"},
+               "json_result": True, "api_key_env": "CURSOR_API_KEY"},
 }
 
 CLI_AGENT_TYPES = tuple(_CLI_SPECS)
@@ -403,15 +406,29 @@ def _num(v) -> int:
 def normalize_usage(usage) -> dict | None:
     """把 CLI 结果里的 usage 归一成审计层认识的 prompt/completion/total 三元组。
 
-    缓存命中/写入的输入 token 也是这次调用真实消耗的输入，计入 prompt_tokens，
-    否则大上下文会话的输入用量会被严重低估。全是 0 / 缺失时返回 None（让上层走估算）。
+    兼容两种键名风格：codebuddy/claude 的 snake_case（input_tokens /
+    cache_read_input_tokens / cache_creation_input_tokens / output_tokens）与
+    cursor 的 camelCase（inputTokens / outputTokens / cacheReadTokens /
+    cacheWriteTokens）。缓存命中/写入的输入 token 也是这次调用真实消耗的输入，
+    计入 prompt_tokens，否则大上下文会话的输入用量会被严重低估。
+    全是 0 / 缺失时返回 None（让上层走估算）。
     """
     if not isinstance(usage, dict):
         return None
-    prompt = (_num(usage.get("input_tokens")) + _num(usage.get("cache_read_input_tokens"))
-              + _num(usage.get("cache_creation_input_tokens")))
-    completion = _num(usage.get("output_tokens"))
-    total = _num(usage.get("total_tokens")) or (prompt + completion)
+
+    def _pick(*keys) -> int:
+        """按顺序取第一个非空键的值（snake_case 与 camelCase 同义键并存）。"""
+        for k in keys:
+            if k in usage:
+                return _num(usage[k])
+        return 0
+
+    prompt = (_pick("input_tokens", "inputTokens")
+              + _pick("cache_read_input_tokens", "cacheReadTokens")
+              + _pick("cache_creation_input_tokens", "cacheWriteTokens"))
+    completion = _pick("output_tokens", "outputTokens")
+    total = _num(usage.get("total_tokens")) or _num(usage.get("totalTokens")) \
+        or (prompt + completion)
     if not (prompt or completion or total):
         return None
     if not total:

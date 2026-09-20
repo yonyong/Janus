@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   Alert,
   App as AntdApp,
-  Avatar,
   Button,
   Card,
   Col,
@@ -15,13 +14,24 @@ import {
   Modal,
   Popconfirm,
   Row,
-  Segmented,
   Space,
+  Spin,
+  Tabs,
   Statistic,
   Tag,
   Typography,
 } from 'antd'
-import { DeleteOutlined, EditOutlined, HolderOutlined, PlusOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import {
+  ApiOutlined,
+  AppstoreOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  HolderOutlined,
+  MoreOutlined,
+  PlusOutlined,
+  SafetyCertificateOutlined,
+  ThunderboltOutlined,
+} from '@ant-design/icons'
 import {
   createAgent,
   deleteAgent,
@@ -76,15 +86,37 @@ function configObjOf(c: unknown): Record<string, any> {
 /** 平台支持的正式 CLI 类型（与后端 _CLI_SPECS / AgentRegistry 注册保持一致）。 */
 const CLI_TYPES = ['claude', 'codex', 'cursor', 'codebuddy'] as const
 
-/** 各类型的展示名与默认 CLI 命令（与后端规格表保持一致）。 */
+/** 各类型的展示名、默认 CLI 命令与头像着色（与后端规格表保持一致）。 */
 const CLI_TYPE_META: Record<
   (typeof CLI_TYPES)[number],
-  { label: string; cmd: string; apiKeyEnv: string }
+  { label: string; cmd: string; apiKeyEnv: string; avatar: string }
 > = {
-  claude: { label: 'Claude Code', cmd: 'claude', apiKeyEnv: 'ANTHROPIC_API_KEY' },
-  codex: { label: 'Codex', cmd: 'codex', apiKeyEnv: 'OPENAI_API_KEY' },
-  cursor: { label: 'Cursor', cmd: 'cursor-agent', apiKeyEnv: 'CURSOR_API_KEY' },
-  codebuddy: { label: 'CodeBuddy', cmd: 'codebuddy', apiKeyEnv: 'CODEBUDDY_API_KEY' },
+  claude: { label: 'Claude Code', cmd: 'claude', apiKeyEnv: 'ANTHROPIC_API_KEY', avatar: 'is-claude' },
+  codex: { label: 'Codex', cmd: 'codex', apiKeyEnv: 'OPENAI_API_KEY', avatar: 'is-codex' },
+  cursor: { label: 'Cursor', cmd: 'cursor-agent', apiKeyEnv: 'CURSOR_API_KEY', avatar: 'is-cursor' },
+  codebuddy: { label: 'CodeBuddy', cmd: 'codebuddy', apiKeyEnv: 'CODEBUDDY_API_KEY', avatar: 'is-codebuddy' },
+}
+
+/** 类型头像着色类：正式类型按品牌色，其余（fake / 自定义）归灰。 */
+function avatarTone(type: string): string {
+  return (CLI_TYPES as readonly string[]).includes(type)
+    ? CLI_TYPE_META[type as keyof typeof CLI_TYPE_META].avatar
+    : 'is-other'
+}
+
+/** 类型展示名：正式类型用品牌名，其余原样展示。 */
+function typeLabel(type: string): string {
+  return (CLI_TYPES as readonly string[]).includes(type)
+    ? CLI_TYPE_META[type as keyof typeof CLI_TYPE_META].label
+    : type
+}
+
+/** Token 用量进度：0~100 的百分比与配色档位（<70 绿 / <100 橙 / ≥100 红）。 */
+function tokenGauge(a: Agent): { pct: number; cls: string } {
+  if (typeof a.token_limit !== 'number' || a.token_limit <= 0) return { pct: 0, cls: 'is-ok' }
+  const pct = Math.min(100, Math.round(((a.used_tokens || 0) / a.token_limit) * 100))
+  const cls = pct >= 100 ? 'is-full' : pct >= 70 ? 'is-warn' : 'is-ok'
+  return { pct, cls }
 }
 
 /**
@@ -320,16 +352,14 @@ export default function AgentList() {
 
   return (
     <div style={{ maxWidth: 1440, margin: '0 auto' }}>
-      <Card styles={{ body: { padding: '20px 24px' } }} style={{ marginBottom: 16 }}>
+      <Card className="ag-card" styles={{ body: { padding: '20px 24px' } }} style={{ marginBottom: 16 }} variant="borderless">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <Space align="center" size={8}>
-              <Typography.Title level={4} style={{ margin: 0 }}>
-                Agent 管理
-              </Typography.Title>
-              <Tag color="blue">{agents.length}</Tag>
-            </Space>
-            <div style={{ color: '#8f959e', fontSize: 13, marginTop: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span className="ag-title">Agent 管理</span>
+              <span className="ag-count">{agents.length}</span>
+            </div>
+            <div className="ag-desc">
               注册并维护编码 Agent；拖动行可调整调度优先级 —— 工作台与 AI 任务优先使用排在前面的
               可用 Agent，Token 日限额用满的自动顺位跳过
             </div>
@@ -351,142 +381,128 @@ export default function AgentList() {
       )}
 
       <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col xs={12} md={6}>
-          <Card>
-            <Statistic title="已注册" value={agents.length} valueStyle={{ color: '#3370ff' }} />
-          </Card>
-        </Col>
-        <Col xs={12} md={6}>
-          <Card>
-            <Statistic
-              title="正式类型"
-              value={agents.filter((a) => (CLI_TYPES as readonly string[]).includes(a.type)).length}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} md={6}>
-          <Card>
-            <Statistic title="遗留联调" value={agents.filter((a) => a.type === 'fake').length} />
-          </Card>
-        </Col>
-        <Col xs={12} md={6}>
-          <Card>
-            <Statistic
-              title="其他"
-              value={agents.filter((a) => !(CLI_TYPES as readonly string[]).includes(a.type) && a.type !== 'fake').length}
-            />
-          </Card>
-        </Col>
+        {[
+          { label: '已注册', value: agents.length, icon: <AppstoreOutlined />, tone: 'is-blue' },
+          {
+            label: '正式类型',
+            value: agents.filter((a) => (CLI_TYPES as readonly string[]).includes(a.type)).length,
+            icon: <SafetyCertificateOutlined />,
+            tone: 'is-green',
+          },
+          { label: '遗留联调', value: agents.filter((a) => a.type === 'fake').length, icon: <ApiOutlined />, tone: 'is-orange' },
+          {
+            label: '其他',
+            value: agents.filter((a) => !(CLI_TYPES as readonly string[]).includes(a.type) && a.type !== 'fake').length,
+            icon: <MoreOutlined />,
+            tone: 'is-gray',
+          },
+        ].map((s) => (
+          <Col xs={12} md={6} key={s.label}>
+            <Card className="ag-card" styles={{ body: { padding: 0 } }} variant="borderless">
+              <div className="ag-stat">
+                <div className={`ag-stat-icon ${s.tone}`}>{s.icon}</div>
+                <div>
+                  <div className="ag-stat-label">{s.label}</div>
+                  <div className="ag-stat-value">{s.value}</div>
+                </div>
+              </div>
+            </Card>
+          </Col>
+        ))}
       </Row>
 
-      <Card>
+      <Card className="ag-card" styles={{ body: { padding: 0 } }} variant="borderless">
         {agents.length === 0 && !loading ? (
-          <Empty description="暂无 Agent，点击「注册 Agent」添加第一个" />
+          <Empty className="ag-empty" description="暂无 Agent，点击「注册 Agent」添加第一个" />
         ) : (
-          <List
-            loading={loading || reordering}
-            dataSource={agents}
-            renderItem={(a, idx) => (
-              <List.Item
-                draggable
-                onDragStart={() => setDragId(a.id)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => moveAgent(a)}
-                onDragEnd={() => setDragId(null)}
-                style={{
-                  opacity: dragId === a.id ? 0.4 : a.available === false ? 0.55 : 1,
-                  cursor: 'grab',
-                }}
-                actions={[
-                  <Button
-                    key="test"
-                    type="text"
-                    icon={<ThunderboltOutlined />}
-                    loading={testingId === a.id}
-                    onClick={() => runTest(a)}
+          <div className="ag-list">
+            <Spin spinning={loading || reordering}>
+              {agents.map((a, idx) => {
+                const gauge = tokenGauge(a)
+                const cfg = configObjOf(a.config)
+                return (
+                  <div
+                    className={`ag-row${dragId === a.id ? ' is-dragging' : ''}${a.available === false ? ' is-disabled' : ''}`}
+                    draggable
+                    onDragStart={() => setDragId(a.id)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => moveAgent(a)}
+                    onDragEnd={() => setDragId(null)}
+                    style={{ cursor: 'grab' }}
                   >
-                    测试
-                  </Button>,
-                  <Button
-                    key="edit"
-                    type="text"
-                    icon={<EditOutlined />}
-                    onClick={() => openEdit(a)}
-                  >
-                    编辑
-                  </Button>,
-                  <Popconfirm
-                    key="del"
-                    title="删除该 Agent？"
-                    okText="删除"
-                    cancelText="取消"
-                    okButtonProps={{ danger: true }}
-                    onConfirm={async () => {
-                      await deleteAgent(a.id)
-                      message.success('已删除')
-                      load()
-                    }}
-                  >
-                    <Button type="text" danger icon={<DeleteOutlined />} />
-                  </Popconfirm>,
-                ]}
-              >
-                <List.Item.Meta
-                  avatar={
-                    <Avatar shape="square" size={40} style={{ background: '#f0f4ff', color: '#3370ff' }}>
-                      <HolderOutlined style={{ color: '#b1b6bd' }} />
-                    </Avatar>
-                  }
-                  title={
-                    <Space size={8} wrap>
-                      <Tag color={idx === 0 ? 'gold' : 'default'} style={{ marginInlineEnd: 0 }}>
-                        优先级 {idx + 1}
-                      </Tag>
-                      <span style={{ fontSize: 14, fontWeight: 500 }}>{a.name}</span>
-                      <Tag color="blue">#{a.id}</Tag>
-                      <Tag>{a.type}</Tag>
-                      {configObjOf(a.config).model && (
-                        <Tag color="purple" style={{ marginInlineEnd: 0 }}>
-                          {String(configObjOf(a.config).model)}
-                        </Tag>
-                      )}
-                      {a.has_api_key && (
-                        <Tag color="geekblue" style={{ marginInlineEnd: 0 }}>
-                          API Key 已配置
-                        </Tag>
-                      )}
-                      {configObjOf(a.config).proxy && (
-                        <Tag color="cyan" style={{ marginInlineEnd: 0 }}>
-                          代理 {String(configObjOf(a.config).proxy)}
-                        </Tag>
-                      )}
-                      {typeof a.token_limit === 'number' && (
-                        <Tag color={a.available === false ? 'red' : 'default'} style={{ marginInlineEnd: 0 }}>
-                          {a.token_limit <= 0
-                            ? 'Token 不限额'
-                            : `Token 今日 ${fmtTokens(a.used_tokens)} / ${fmtTokens(a.token_limit)}`}
-                        </Tag>
-                      )}
-                      {a.available === false && (
-                        <Tag color="red" style={{ marginInlineEnd: 0 }}>
-                          今日限额已满 · 不可用
-                        </Tag>
-                      )}
-                    </Space>
-                  }
-                  description={
-                    <Typography.Text type="secondary" code style={{ fontSize: 12 }}>
-                      {typeof a.config === 'string' ? a.config : JSON.stringify(a.config)}
-                    </Typography.Text>
-                  }
-                />
-              </List.Item>
-            )}
-          />
+                    <span className="ag-drag">
+                      <HolderOutlined />
+                    </span>
+                    <div className={`ag-avatar ${avatarTone(a.type)}`}>
+                      {typeLabel(a.type).charAt(0).toUpperCase()}
+                    </div>
+                    <div className="ag-main">
+                      <div className="ag-line1">
+                        <span className="ag-name">{a.name}</span>
+                        <span className={`ag-chip ${idx === 0 ? 'c-gold' : 'c-gray'}`}>
+                          优先级 {idx + 1}
+                        </span>
+                        <span className="ag-chip c-blue">{typeLabel(a.type)}</span>
+                        {cfg.model && <span className="ag-chip c-purple">{String(cfg.model)}</span>}
+                        {a.has_api_key && <span className="ag-chip c-green">API Key 已配置</span>}
+                        {cfg.proxy && <span className="ag-chip c-cyan">代理</span>}
+                        {a.available === false && <span className="ag-chip c-red">今日限额已满 · 不可用</span>}
+                      </div>
+                      <div className="ag-line2">
+                        {typeof a.token_limit === 'number' && a.token_limit > 0 && (
+                          <span className="ag-token" title={`今日 ${a.used_tokens || 0} / ${a.token_limit} tokens`}>
+                            <span className="ag-token-bar">
+                              <span className={`ag-token-fill ${gauge.cls}`} style={{ width: `${gauge.pct}%` }} />
+                            </span>
+                            <span className="ag-token-text">
+                              今日 {fmtTokens(a.used_tokens)} / {fmtTokens(a.token_limit)}
+                              {a.token_limit > 0 ? ` · ${gauge.pct}%` : ''}
+                            </span>
+                          </span>
+                        )}
+                        {typeof a.token_limit === 'number' && a.token_limit <= 0 && (
+                          <span className="ag-token-text">Token 不限额</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="ag-row-actions">
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<ThunderboltOutlined />}
+                        loading={testingId === a.id}
+                        onClick={() => runTest(a)}
+                      >
+                        测试
+                      </Button>
+                      <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(a)}>
+                        编辑
+                      </Button>
+                      <Popconfirm
+                        title="删除该 Agent？"
+                        okText="删除"
+                        cancelText="取消"
+                        okButtonProps={{ danger: true }}
+                        onConfirm={async () => {
+                          await deleteAgent(a.id)
+                          message.success('已删除')
+                          load()
+                        }}
+                      >
+                        <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                      </Popconfirm>
+                    </div>
+                  </div>
+                )
+              })}
+            </Spin>
+          </div>
         )}
       </Card>
 
       <Modal
+        className="ag-edit-modal"
+        width="min(1180px, 96vw)"
         title={editing ? `编辑 Agent · #${editing.id}` : '注册 Agent'}
         open={open}
         onCancel={() => {
@@ -498,71 +514,98 @@ export default function AgentList() {
         cancelText="取消"
         confirmLoading={saving}
       >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }} requiredMark={false}>
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入 Agent 名称' }]}>
-            <Input placeholder="例如：claude-1" />
-          </Form.Item>
-          <Form.Item label="类型">
-            <Segmented
-              value={type}
-              onChange={(v) => {
-                const t = String(v)
-                setType(t)
-                // 切类型即同步 config.cmd，避免「类型是 Claude、实际还在跑 codebuddy」的错位
-                setConfigText((prev) => syncCmdInConfigText(prev, CLI_TYPE_META[t as keyof typeof CLI_TYPE_META].cmd))
-              }}
-              options={CLI_TYPES.map((t) => ({ label: CLI_TYPE_META[t].label, value: t }))}
-            />
-          </Form.Item>
-          <Form.Item
-            name="model"
-            label="模型名称"
-            extra="保存后写入 config.model，调用对应 CLI 时拼 --model 参数；留空使用该 CLI 的默认模型"
-          >
-            <Input placeholder="例如 GLM-4.7，留空用默认模型" allowClear />
-          </Form.Item>
-          <Form.Item
-            name="apiKey"
-            label="API Key"
-            extra={`保存后写入 config.api_key，调用该 CLI 时注入环境变量 ${CLI_TYPE_META[type as keyof typeof CLI_TYPE_META]?.apiKeyEnv || 'API_KEY'}（可用 config.api_key_env 覆盖变量名）；已配置时回显掩码，清空即删除，输入新值即覆盖`}
-          >
-            <Input.Password
-              placeholder="例如 sk-...，留空使用 CLI 已登录的凭证"
-              autoComplete="new-password"
-              visibilityToggle
-            />
-          </Form.Item>
-          <Form.Item
-            name="proxy"
-            label="代理地址"
-            extra="保存后写入 config.proxy，调用该 CLI 的子进程会注入 HTTP_PROXY / HTTPS_PROXY（NO_PROXY 固定排除 localhost、127.0.0.1）；留空不配置代理"
-          >
-            <Input placeholder="例如 http://127.0.0.1:7890" allowClear />
-          </Form.Item>
-          <Form.Item
-            name="tokenLimit"
-            label="Token 日限额"
-            initialValue={DEFAULT_TOKEN_LIMIT}
-            extra="每日 Token 用量达到限额后该 Agent 当天不可用（次日自动重置），AI 任务自动顺位使用下一个可用 Agent；0 表示不限额"
-          >
-            <InputNumber<number>
-              min={0}
-              step={1000000}
-              style={{ width: '100%' }}
-              formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(v) => Number((v || '0').replace(/,/g, ''))}
-            />
-          </Form.Item>
-          <Form.Item
-            label="config（JSON）"
-            extra={'切换「类型」会自动同步 cmd；「模型名称」保存后写入 config.model。也可直接改 JSON，如 {"args":[]}'}
-          >
-            <Input.TextArea
-              rows={3}
-              value={configText}
-              onChange={(e) => setConfigText(e.target.value)}
-            />
-          </Form.Item>
+        <Form form={form} layout="vertical" className="ag-edit-form" requiredMark={false}>
+          {/* 类型选择：Tab 左右切换，避免「类型是 Claude、实际还在跑 codebuddy」的错位 */}
+          <Tabs
+            className="ag-edit-tabs"
+            activeKey={type}
+            onChange={(t) => {
+              setType(t)
+              setConfigText((prev) =>
+                syncCmdInConfigText(prev, CLI_TYPE_META[t as keyof typeof CLI_TYPE_META].cmd),
+              )
+            }}
+            items={CLI_TYPES.map((t) => {
+              const meta = CLI_TYPE_META[t]
+              return {
+                key: t,
+                label: (
+                  <span className={`ag-type-tab-label ${avatarTone(t)}`}>{meta.label}</span>
+                ),
+                children: (
+                  <div className="ag-type-panel">
+                    默认命令 <code>{meta.cmd}</code>，调用该 CLI 的子进程会注入环境变量{' '}
+                    <code>{meta.apiKeyEnv}</code>（可用 config.api_key_env 覆盖变量名）
+                  </div>
+                ),
+              }
+            })}
+          />
+
+          {/* 两列网格：配置并排铺开，接近全屏的面板里一屏即可配完，无需滚动 */}
+          <div className="ag-edit-grid">
+            <Form.Item
+              name="name"
+              label="名称"
+              rules={[{ required: true, message: '请输入 Agent 名称' }]}
+            >
+              <Input placeholder="例如：claude-1" />
+            </Form.Item>
+            <Form.Item
+              name="model"
+              label="模型名称"
+              extra="保存后写入 config.model，调用对应 CLI 时拼 --model 参数；留空使用默认模型"
+            >
+              <Input placeholder="例如 GLM-4.7，留空用默认模型" allowClear />
+            </Form.Item>
+            <Form.Item
+              name="apiKey"
+              label="API Key"
+              extra={`保存后写入 config.api_key，调用该 CLI 时注入环境变量 ${
+                CLI_TYPE_META[type as keyof typeof CLI_TYPE_META]?.apiKeyEnv || 'API_KEY'
+              }（可用 config.api_key_env 覆盖变量名）；已配置时回显掩码，清空即删除，输入新值即覆盖`}
+            >
+              <Input.Password
+                placeholder="例如 sk-...，留空使用 CLI 已登录的凭证"
+                autoComplete="new-password"
+                visibilityToggle
+              />
+            </Form.Item>
+            <Form.Item
+              name="proxy"
+              label="代理地址"
+              extra="保存后写入 config.proxy，调用该 CLI 的子进程会注入 HTTP_PROXY / HTTPS_PROXY（NO_PROXY 固定排除 localhost、127.0.0.1）；留空不配置代理"
+            >
+              <Input placeholder="例如 http://127.0.0.1:7890" allowClear />
+            </Form.Item>
+            <Form.Item
+              name="tokenLimit"
+              label="Token 日限额"
+              initialValue={DEFAULT_TOKEN_LIMIT}
+              extra="每日 Token 用量达到限额后该 Agent 当天不可用（次日自动重置），AI 任务自动顺位使用下一个可用 Agent；0 表示不限额"
+            >
+              <InputNumber<number>
+                min={0}
+                step={1000000}
+                style={{ width: '100%' }}
+                formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                parser={(v) => Number((v || '0').replace(/,/g, ''))}
+              />
+            </Form.Item>
+            <Form.Item
+              className="ag-grid-full"
+              label="config（JSON）"
+              extra='「模型名称」保存后写入 config.model。也可直接改 JSON，如 {"args":[]}'
+            >
+              <Input.TextArea
+                className="ag-code"
+                rows={4}
+                spellCheck={false}
+                value={configText}
+                onChange={(e) => setConfigText(e.target.value)}
+              />
+            </Form.Item>
+          </div>
         </Form>
       </Modal>
 

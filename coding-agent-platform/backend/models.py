@@ -113,6 +113,8 @@ class RequirementUpdate(BaseModel):
     # 详细设计文档（Agent 分析生成或用户手写）；与原始需求 description 分开存
     design_doc: str | None = None
     stage: str | None = None
+    # 工作流模式：full 标准四阶段 / lite 轻量三节点主轴（工作台可随时切换）
+    mode: str | None = None
     # 本次修改的来源，只用于版本历史打标：manual 手动保存 / ai 采纳了润色结果
     source: str | None = None
 

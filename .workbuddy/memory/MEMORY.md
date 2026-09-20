@@ -28,12 +28,19 @@ node tools/ui_smoke_workbench.mjs "http://127.0.0.1:8000/?token=<令牌>#/workbe
   修法：函数体内对它做空实现兜底，或所有直调处（tests/*.py、tools/smoke_*.py）显式传 no-op。
 
 ## 需求工作流要点
-- 四阶段展示：需求澄清(clarify) → 用例配置(verify) → 编码实现(build) → 归档验收(archive)。
-  仅 archive 单栏无对话；verify 也有右侧对话（2026-09-19 起）：快捷指令让 Agent 写用例草稿
-  `.janus/{dir}/usecase/cases-draft.md`，对话结束 Workbench 自动调
-  `POST /api/requirements/{rid}/cases/import` 落库（同标题跳过、导入后删草稿）——
-  页面上没有导入按钮，别按旧文档加回来。
-  「一键生成用例」按钮已移除（后端 /cases/generate 180s 探针接口还在，前端无入口）。
+- 四阶段存储不变：需求澄清(clarify) → 用例配置(verify) → 编码实现(build) → 归档验收(archive)。
+  **2026-09-20 工作台 UI 重做（用户定稿）**：顶部步骤条整体移除、标准/轻量模式切换移除
+  （后端 requirement.mode 字段还在但前端不再读写）；阶段感知由右栏「流程指令」清单承载
+  （`FlowCommands.tsx`：6 条指令跨阶段连续编号、按产出自动判「已完成」/「建议下一步」，
+  点击=changeStage+loadDraft；「下一步引导卡」只提示不带按钮，操作入口唯一在指令清单）。
+  左栏固定文件区 `FileWorkArea.tsx`：竖向分类页签（需求文档/用例/归档/项目文件，阶段→分类单向联动）
+  + 分类内横向子页签；编码分类只有「文件/改动」两个子页签（测试/编码事件流页签已删，
+  testEvents/codeEvents 仍收集但不渲染）；归档不再是独立单栏页。分栏可拖拽（320px~62%，双击复位）
+  + 收起按钮。RequirementPane 的 quickCommands 不再传（指令统一在 FlowCommands）。
+  话术源头：`FlowCommands.buildFlowCommands(dir)` / `verifyCasesPrompt(dir)`。
+  verify 仍有右侧对话：指令写用例草稿 `.janus/{dir}/usecase/cases-draft.md`，对话结束自动调
+  `POST /api/requirements/{rid}/cases/import`（同标题跳过、导入后删草稿）——页面没有导入按钮。
+  「一键生成用例」无前端入口（后端 /cases/generate 还在）。
   用例支持勾选批量删除（POST /api/cases/batch-delete，整批校验不部分删）。
 - 需求标题：**创建时后端自动加 `v-yyyyMMddHHmmss-` 前缀**（`app.py::_apply_req_title_prefix`，
   已带前缀不重复加）；创建后标题不可改（.janus/ 目录名依赖标题）。
@@ -42,7 +49,10 @@ node tools/ui_smoke_workbench.mjs "http://127.0.0.1:8000/?token=<令牌>#/workbe
   `db.py::_backfill_versions` 幂等补老需求的 create 版。
 - 改动记录（change_sets，backend/snapshots.py）不依赖 git：agent 运行前后快照 diff，finally 里落库；
   二进制只记指纹不可回退；回退本身也记 revert 记录。
-- 前端关键组件类名（ui_smoke_workbench.mjs 依赖，勿改）：`.case-pane/.chg-pane/.chg-set/.vh-item/.arc-card/.wb-tabs/.doc-editor`。
+- 前端关键类名（ui_smoke_workbench.mjs / ui_smoke_preview.mjs 依赖，勿改）：
+  `.case-pane/.chg-pane/.chg-set/.vh-item/.arc-card/.wb-tabs/.wb-tab/.doc-editor/.fp-node`；
+  新结构：`.wfa-rail-item`(竖向分类)、`.fc-row`(流程指令)、`.wb-stage-chip`(阶段 chip)、
+  `.wb-split`(拖拽把手)。WorkflowSteps.tsx 已删除；UI 冒烟导航走左栏分类页签，不再点 Steps。
 
 ## 工作台文件预览（2026-09-19 起）
 - 后端：`GET /api/projects/{pid}/file/raw`（`?download=true` 附件头）+ `GET .../raw/{rel_path:path}`
@@ -59,6 +69,7 @@ node tools/ui_smoke_workbench.mjs "http://127.0.0.1:8000/?token=<令牌>#/workbe
 ## Agent 探测与宿主环境变量（最易复发）
 - 宿主会注入会话环境变量（SERVER__PORT、CODEBUDDY_*/CLAUDE_* 等）给子进程 → codebuddy CLI 误判
   在宿主网关内 → EADDRINUSE 静默挂死。**适配器 subprocess 必须过 `adapters/codebuddy.py::_clean_env()`**。
+- cursor 规格必须带 `--trust`（_CLI_SPECS），否则 cursor-agent 在临时目录弹 Workspace Trust 直接失败。
 - 超时终止要连进程树杀（`taskkill /F /T /PID`）；目录回收用 `agent_test._rmtree_with_retry`。
 - 排查"超时"：先查孤儿进程 → 换目录对照 → `env | grep` 找宿主注入；别信前端归因文案。
 

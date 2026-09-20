@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef, useEffect } from 'react'
-import { Avatar, Empty, Space, Spin, Tag, Typography } from 'antd'
+import { Avatar, Empty, Space, Spin, Typography } from 'antd'
 import { ArrowRightOutlined, BulbOutlined, RobotOutlined, ThunderboltOutlined, UserOutlined } from '@ant-design/icons'
 import ChatPanel, { type ChatPanelHandle } from './ChatPanel'
 import RichText from './RichText'
@@ -32,7 +32,6 @@ export interface StepHint {
 const RequirementPane = forwardRef<
   RequirementPaneHandle,
   {
-    requirement: { title?: string; description?: string } | null
     messages: ChatMessage[]
     busy: boolean
     /** Agent 正在流式输出的正文（实时累积，最终答复到达后清空）。 */
@@ -40,8 +39,6 @@ const RequirementPane = forwardRef<
     /** 瞬态状态提示（如「调用工具 …」），没有正文在流式时显示。 */
     statusText?: string
     onSend: (text: string) => void
-    /** 需求澄清阶段左侧已是文档编辑器，这里不再重复贴一遍需求正文。 */
-    showBrief?: boolean
     /** 非空时在输入框上方渲染常用指令按钮（编码实现阶段使用）。 */
     quickCommands?: QuickCommand[]
     /** 上一步完成后的下一步引导（如「润色完成 → 生成详细设计」）。 */
@@ -56,13 +53,11 @@ const RequirementPane = forwardRef<
     aborting?: boolean
   }
 >(function RequirementPane({
-  requirement,
   messages,
   busy,
   streamText = '',
   statusText = '',
   onSend,
-  showBrief = true,
   quickCommands,
   stepHint,
   onHintAction,
@@ -86,24 +81,6 @@ const RequirementPane = forwardRef<
 
   return (
     <div className="chat-pane">
-      {showBrief && (
-        <div className="req-brief">
-          <Space size={8} align="start">
-            <Tag color="blue" style={{ marginInlineEnd: 0 }}>
-              需求
-            </Tag>
-            <div>
-              <Typography.Text strong style={{ fontSize: 14 }}>
-                {requirement?.title || '未关联需求'}
-              </Typography.Text>
-              <div className="req-desc">
-                {requirement?.description || '（无描述）'}
-              </div>
-            </div>
-          </Space>
-        </div>
-      )}
-
       <div className="chat-scroll" ref={scrollRef}>
         {messages.length === 0 && !busy ? (
           <Empty

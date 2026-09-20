@@ -91,6 +91,12 @@ try:
     st, bad = call("POST", f"/api/projects/{pid}/requirements", {"token": tk},
                    {"title": "乱传模式", "mode": "hack"})
     check("非法 mode 回落 full", (st, bad["mode"], bad["stage"]), (200, "full", "clarify"))
+    st, out = call("PATCH", f"/api/requirements/{rid}", {"token": tk}, {"mode": "lite"})
+    check("PATCH 切轻量", (st, out["mode"]), (200, "lite"))
+    st, out = call("PATCH", f"/api/requirements/{rid}", {"token": tk}, {"mode": "hack"})
+    check("PATCH 非法 mode 忽略", (st, out["mode"]), (200, "lite"))
+    st, out = call("PATCH", f"/api/requirements/{rid}", {"token": tk}, {"mode": "full"})
+    check("PATCH 切回标准", (st, out["mode"]), (200, "full"))
 
     st, agent = call("POST", "/api/agents", {"admin": ADMIN},
                      {"name": "stub", "type": "stub", "config": {}})
