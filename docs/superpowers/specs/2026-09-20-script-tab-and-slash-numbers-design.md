@@ -1,6 +1,6 @@
 ---
 role: technical-design
-status: draft
+status: final
 topic: script-tab-and-slash-numbers
 ---
 
