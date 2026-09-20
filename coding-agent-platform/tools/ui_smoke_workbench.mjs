@@ -115,17 +115,16 @@ async function waitFor(expr, label, timeoutMs = 20000) {
   }
 }
 
-/** 点击工作流节点：按标题文本定位 antd Steps 的某一项。 */
-async function clickStep(label) {
+/** 点击左栏竖向分类页签：按文本定位（新 UI 无顶部步骤条）。 */
+async function clickRail(label) {
   const r = await evaluate(`(() => {
-    const items = [...document.querySelectorAll('.wb-flow .ant-steps-item')]
-    const hit = items.find(el => el.querySelector('.ant-steps-item-title')?.textContent?.includes(${JSON.stringify(label)}))
+    const items = [...document.querySelectorAll('.wfa-rail-item')]
+    const hit = items.find(el => el.querySelector('.wfa-rail-label')?.textContent?.trim() === ${JSON.stringify(label)})
     if (!hit) return 'not-found'
-    const target = hit.querySelector('.ant-steps-item-container') || hit
-    target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
+    hit.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
     return 'clicked'
   })()`)
-  if (r !== 'clicked') fail(`点击工作流节点「${label}」失败：${r}`)
+  if (r !== 'clicked') fail(`点击左栏分类「${label}」失败：${r}`)
   return r
 }
 
@@ -198,35 +197,27 @@ async function expandDir(name, tries = 8, settleMs = 400) {
   return (await count('.fp-node')) > before
 }
 
-/** 当前激活的工作流节点标题（只取 title，不含 antd 的 description）。 */
+/** 当前阶段 chip 文本。 */
 const activeStage = () =>
   evaluate(
-    `document.querySelector('.wb-flow .ant-steps-item-active .ant-steps-item-title')?.textContent?.trim() || ''`,
+    `document.querySelector('.wb-stage-chip')?.textContent?.trim() || ''`,
   )
 
-/** 各阶段左栏就绪的判定选择器：切换后用它确认面板真的渲染出来了。 */
-const STAGE_READY = {
-  需求澄清: ['.doc-editor', '需求文档编辑器'],
-  用例配置: ['.case-pane', '用例面板'],
-  编码实现: ['.wb-tabs', '文件树面板'],
-  归档验收: ['.arc-card', '归档汇总卡片'],
+/** 左栏分类就绪的判定选择器：切换后用它确认面板真的渲染出来了。 */
+const CAT_READY = {
+  需求文档: ['.doc-editor', '需求文档编辑器'],
+  用例: ['.case-pane', '用例面板'],
+  项目文件: ['.wb-tabs', '文件树面板'],
+  归档: ['.arc-card', '归档汇总卡片'],
 }
 
-/** 节点条在没拿到看板数据时会显示这四个固定提示语，摘要一旦不是它们就说明数据到位了。 */
-const STAGE_HINTS = [
-  '原始需求 + 详细设计 + 附件，写清要做什么',
-  'AI 生成或手动配置用例与附件，作为验收与单测依据',
-  '对话驱动 Agent 按设计文档改代码、执行配置的单测',
-  '汇总改动与结论，留档',
-]
-/** 看板数据是否已到位（requirementWorkflow 已返回）。 */
-const flowLoadedExpr = `[...document.querySelectorAll('.wb-flow-desc')]
-  .some(e => ${JSON.stringify(STAGE_HINTS)}.indexOf(e.textContent.trim()) === -1)`
+/** 流程指令清单数据是否已到位（requirementWorkflow 已返回，6 条指令都渲染出来）。 */
+const flowLoadedExpr = `document.querySelectorAll('.fc-row').length >= 6`
 
-/** 切到指定阶段并等待其左栏面板就绪。 */
-async function gotoStage(label) {
-  const [sel, name] = STAGE_READY[label] || [null, label]
-  await clickStep(label)
+/** 切到指定分类并等待其面板就绪。 */
+async function gotoCat(label) {
+  const [sel, name] = CAT_READY[label] || [null, label]
+  await clickRail(label)
   if (!sel) return false
   return waitFor(`!!document.querySelector(${JSON.stringify(sel)})`, `${name}出现`)
 }
@@ -277,22 +268,24 @@ try {
   // 页面按数据库里存的阶段渲染，进来不一定是「需求澄清」（上一次冒烟或人工操作
   // 可能把它留在后面某个阶段），所以先读出初始阶段用于收尾还原，再显式切过去。
   console.log('1) 需求澄清')
-  if (!(await waitFor(`!!document.querySelector('.wb-flow')`, '工作流节点条出现'))) {
-    throw new Error('工作流节点条未渲染，后续阶段无法继续')
+  if (!(await waitFor(`!!document.querySelector('.flow-cmds')`, '流程指令清单出现'))) {
+    throw new Error('流程指令清单未渲染，后续无法继续')
   }
-  const steps = await evaluate(
-    `[...document.querySelectorAll('.wb-flow .ant-steps-item-title')].map(e => e.textContent.trim())`,
-  )
-  console.log(`   工作流节点：${JSON.stringify(steps)}`)
-  if (steps.length !== 4) fail(`工作流应有 4 个节点，实际 ${steps.length}`)
-  // 等看板数据到位再读阶段：阶段初值是 'clarify'，数据库里的真实阶段要等
-  // session 详情 / workflow 两个请求回来才会生效，读早了会把初始阶段误判成需求澄清。
+  // 默认收起：验证初始态，再点头部展开做后续断言
+  if (!(await evaluate(`!!document.querySelector('.flow-cmds.closed')`))) {
+    fail('流程指令清单应默认收起')
+  }
+  await evaluate(`document.querySelector('.fc-head')?.click()`)
+  // 等看板数据到位：6 条流程指令都渲染出来即 requirementWorkflow 已返回
   await waitFor(flowLoadedExpr, '工作流看板数据加载完成')
+  const fcCount = await count('.fc-row')
+  console.log(`   流程指令条数：${fcCount}`)
+  if (fcCount !== 6) fail(`流程指令应有 6 条，实际 ${fcCount}`)
   await sleep(400)
   const initialStage = await activeStage()
   console.log(`   进入时阶段：${initialStage || '(未识别)'}`)
 
-  if (await gotoStage('需求澄清')) {
+  if (await gotoCat('需求文档')) {
     const docLen = await evaluate(`document.querySelector('.doc-editor')?.value?.length || 0`)
     console.log(`   需求文档字数：${docLen}`)
     console.log(`   右栏对话输入框：${(await count('.chat-input, textarea')) > 0}`)
@@ -380,16 +373,17 @@ try {
     }
   }
 
-  // ---------------- 阶段二：编码实现 ----------------
-  console.log('2) 编码实现（文件树 + 对话 + 常用指令）')
-  await gotoStage('编码实现')
-  // 编码实现阶段：右栏对话输入框上方应有常用指令条（两条固定指令）
-  const qcCount = await waitFor(
-    `document.querySelectorAll('.quick-commands button').length >= 2`,
-    '常用指令条出现',
+  // ---------------- 分类二：项目文件 ----------------
+  console.log('2) 项目文件（文件树 + 对话 + 流程指令）')
+  await gotoCat('项目文件')
+  // 右栏流程指令清单：6 条指令跨阶段连续编号，含当前阶段高亮（收起态则先展开）
+  await evaluate(`document.querySelector('.flow-cmds.closed .fc-head')?.click()`)
+  const fcOk = await waitFor(
+    `document.querySelectorAll('.fc-row').length >= 6`,
+    '流程指令清单渲染',
     6000,
   )
-  if (!qcCount) fail('编码实现阶段应在对话输入框上方渲染常用指令条')
+  if (!fcOk) fail('右栏应渲染 6 条流程指令')
   if (!(await waitFor(`document.querySelectorAll('.fp-node').length > 0`, '文件树渲染'))) {
     console.log('   （文件树没渲染出来，跳过本阶段的树断言）')
   } else {
@@ -464,16 +458,16 @@ try {
     }
   }
 
-  // ---------------- 阶段三：用例配置 ----------------
-  console.log('3) 用例配置（用例 + 附件 + 右侧对话）')
-  await gotoStage('用例配置')
-  // 用例配置现在也有右栏对话（快捷指令生成用例草稿 → 对话结束自动导入落库）
+  // ---------------- 分类三：用例 ----------------
+  console.log('3) 用例（用例 + 附件 + 右侧对话）')
+  await gotoCat('用例')
+  // 用例分类也有右栏对话（流程指令生成用例草稿 → 对话结束自动导入落库）
   const rightBack = await waitFor(
     `!!document.querySelector('.wb-right .chat-pane')`,
     '右栏对话已渲染',
     6000,
   )
-  if (!rightBack) fail('用例配置阶段应有右栏对话（生成用例走对话流式输出）')
+  if (!rightBack) fail('用例分类应有右栏对话（生成用例走对话流式输出）')
   const caseCount = await count('.case-row')
   console.log(`   用例条数：${caseCount}`)
   console.log(`   页头：${JSON.stringify(await text('.case-head'))}`)
@@ -492,9 +486,9 @@ try {
   if (caseCount === 0) console.log('   （演示需求还没有用例，可在右侧对话让 Agent 生成）')
   await shot('ui-3-verify.png')
 
-  // ---------------- 阶段四：归档验收 ----------------
-  console.log('4) 归档验收')
-  await gotoStage('归档验收')
+  // ---------------- 分类四：归档 ----------------
+  console.log('4) 归档')
+  await gotoCat('归档')
   const cards = await evaluate(
     `[...document.querySelectorAll('.arc-card-head')].map(e => e.textContent.trim())`,
   )
@@ -502,11 +496,10 @@ try {
   console.log(`   验收结论区：${await evaluate(`!!document.querySelector('.arc-verdict')`)}`)
   await shot('ui-4-archive.png')
 
-  // ---------------- 收尾：还原进入时的阶段 ----------------
-  // 冒烟只做走查，跑完把演示需求放回原来的阶段，不改变人工体验的起点。
-  const restore = STAGE_READY[initialStage] ? initialStage : '需求澄清'
-  console.log(`5) 还原阶段 → ${restore}`)
-  await gotoStage(restore)
+  // ---------------- 收尾：还原进入时的分类 ----------------
+  // 冒烟只做走查；左栏分类切换不落库，把页面切回需求文档分类即可。
+  console.log('5) 还原左栏 → 需求文档')
+  await gotoCat('需求文档')
 
   console.log(`\nUI 冒烟${fails.length ? `失败 ${fails.length} 项: ${fails.join('; ')}` : '完成 ✅'}`)
   if (fails.length) process.exitCode = 1

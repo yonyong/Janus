@@ -113,16 +113,15 @@ async function waitFor(expr, label, timeoutMs = 20000) {
   }
 }
 
-async function clickStep(label) {
+async function clickRail(label) {
   const r = await evaluate(`(() => {
-    const items = [...document.querySelectorAll('.wb-flow .ant-steps-item')]
-    const hit = items.find(el => el.querySelector('.ant-steps-item-title')?.textContent?.includes(${JSON.stringify(label)}))
+    const items = [...document.querySelectorAll('.wfa-rail-item')]
+    const hit = items.find(el => el.querySelector('.wfa-rail-label')?.textContent?.trim() === ${JSON.stringify(label)})
     if (!hit) return 'not-found'
-    const target = hit.querySelector('.ant-steps-item-container') || hit
-    target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
+    hit.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
     return 'clicked'
   })()`)
-  if (r !== 'clicked') fail(`点击工作流节点「${label}」失败：${r}`)
+  if (r !== 'clicked') fail(`点击左栏分类「${label}」失败：${r}`)
   return r
 }
 
@@ -188,8 +187,8 @@ async function main() {
   await sleep(1500)
 
   // 进入编码实现阶段，等文件树
-  await waitFor(`!!document.querySelector('.wb-flow')`, '工作流节点条出现')
-  await clickStep('编码实现')
+  await waitFor(`!!document.querySelector('.flow-cmds')`, '流程指令清单出现')
+  await clickRail('项目文件')
   await waitFor(`document.querySelectorAll('.fp-node').length > 0`, '文件树渲染')
 
   // ---------- 1) html：预览 + 源码 ----------
@@ -258,8 +257,8 @@ async function main() {
     // 刷新页面让文件树重新拉取（FilePane 的树刷新由 Agent 改动信号驱动，这里直接重载）
     await evaluate(`location.reload()`)
     await sleep(2500)
-    await waitFor(`!!document.querySelector('.wb-flow')`, '页面重载完成')
-    await clickStep('编码实现')
+    await waitFor(`!!document.querySelector('.flow-cmds')`, '页面重载完成')
+    await clickRail('项目文件')
     await waitFor(`document.querySelectorAll('.fp-node').length > 0`, '文件树重新渲染')
     await clickNode('PreviewSmoke.java')
     await waitFor(`!!document.querySelector('.ant-modal pre.fv-code code .hljs-keyword')`,
@@ -296,8 +295,8 @@ async function main() {
       writeFileSync(xlsxPath, XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }))
       await evaluate(`location.reload()`)
       await sleep(2500)
-      await waitFor(`!!document.querySelector('.wb-flow')`, '页面重载完成')
-      await clickStep('编码实现')
+      await waitFor(`!!document.querySelector('.flow-cmds')`, '页面重载完成')
+      await clickRail('项目文件')
       await waitFor(`document.querySelectorAll('.fp-node').length > 0`, '文件树重新渲染')
       await clickNode('PreviewSmoke.xlsx')
       await waitFor(`!!document.querySelector('.ant-modal .fv-sheet table')`, '默认进入表格预览（SheetJS 解析）')

@@ -364,10 +364,119 @@ body {
 .wb-body {
   flex: 1;
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(360px, 44%) 1fr;
+  display: flex;
   gap: 10px;
   padding: 10px;
+}
+
+/* 左栏宽度由内联样式控制（默认 42%，可拖拽 320px ~ 62% 或收起） */
+body.wb-dragging {
+  user-select: none;
+  cursor: col-resize;
+}
+
+body.wb-dragging .wb-left,
+body.wb-dragging .wb-right {
+  transition: none;
+}
+
+.wb-left {
+  position: relative;
+  flex: none;
+  width: 42%;
+}
+
+.wb-right {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 分栏拖拽把手 + 收起按钮：骑在左右分栏线上 */
+.wb-split {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -8px;
+  width: 16px;
+  z-index: 30;
+  cursor: col-resize;
+  display: grid;
+  place-items: center;
+}
+
+.wb-split::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 6px;
+  width: 4px;
+  border-radius: 4px;
+  background: transparent;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.wb-split:hover::after,
+body.wb-dragging .wb-split::after {
+  background: var(--primary);
+  opacity: 0.3;
+}
+
+.wb-split-grip {
+  width: 12px;
+  height: 46px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 6px rgba(31, 35, 41, 0.08);
+  pointer-events: none;
+}
+
+.wb-collapse-btn {
+  position: absolute;
+  top: 10px;
+  right: -13px;
+  z-index: 31;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  color: var(--text-4);
+  box-shadow: 0 1px 2px rgba(31, 35, 41, 0.04), 0 4px 16px rgba(31, 35, 41, 0.06);
+  transition: color 0.15s;
+}
+
+.wb-collapse-btn:hover {
+  color: var(--primary);
+}
+
+.wb-body.wb-left-collapsed .wb-left {
+  width: 0 !important;
+  min-width: 0;
+  border: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.wb-body.wb-left-collapsed .wb-split,
+.wb-body.wb-left-collapsed .wb-left .wfa {
+  display: none;
+}
+
+.wb-body.wb-left-collapsed .wb-collapse-btn {
+  right: -2px;
+  z-index: 40;
+}
+
+/* 顶部当前阶段 chip */
+.wb-stage-chip {
+  color: var(--primary-deep) !important;
+  background: #eef4ff !important;
+  border-color: #d4e2ff !important;
+  font-weight: 550;
 }
 
 .wb-left,
@@ -571,188 +680,6 @@ body {
   flex: none;
   padding: 6px 12px;
   border-top: 1px solid var(--border-light);
-}
-
-/* ---------- 工作流节点条 ---------- */
-.wb-flow {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 8px 14px 10px;
-  background: #fff;
-  border-bottom: 1px solid var(--border);
-}
-
-.wb-flow-steps {
-  flex: 1;
-  min-width: 0;
-}
-
-/* antd Steps 内部默认不收缩，窄屏时会把右侧「当前阶段」提示顶出视口造成文字重叠；
-   这里强制 item 与内容区可收缩，超长文本一律省略号截断。 */
-.wb-flow-steps .ant-steps-item {
-  min-width: 0;
-}
-
-.wb-flow-steps .ant-steps-item-content {
-  min-width: 0;
-  overflow: hidden;
-}
-
-.wb-flow-steps .ant-steps-item-title {
-  font-size: var(--fs-sm) !important;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.wb-flow-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.wb-flow-done {
-  color: var(--success);
-  font-size: var(--fs-xs);
-  flex: none;
-}
-
-.wb-flow-desc {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--fs-xs);
-  color: var(--text-4);
-}
-
-.wb-flow-side {
-  flex: 0 1 auto;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  white-space: nowrap;
-}
-
-.wb-flow-hint {
-  font-size: var(--fs-xs);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ---------- 轻量工作流步骤条：定义（可选）→ 编码实现 → 归档验收 ---------- */
-.wb-lite-steps {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: flex-start;
-}
-
-.wb-lite-node {
-  flex: 1;
-  min-width: 0;
-  position: relative;
-  text-align: center;
-  cursor: pointer;
-  padding: 0 4px;
-}
-
-.wb-lite-node:last-child {
-  flex: 0 0 auto;
-  padding: 0 8px;
-}
-
-.wb-lite-dot {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  margin: 0 auto 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  position: relative;
-  z-index: 1;
-  background: #fff;
-  border: 1.5px solid var(--border);
-  color: var(--text-3);
-  transition: all 0.2s;
-}
-
-.wb-lite-node.active .wb-lite-dot {
-  border-color: var(--primary);
-  color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(51, 112, 255, 0.12);
-}
-
-.wb-lite-node.done .wb-lite-dot {
-  border-color: var(--primary);
-  background: var(--primary);
-  color: #fff;
-}
-
-.wb-lite-node.skipped .wb-lite-dot {
-  border-style: dashed;
-  background: #fafafa;
-  color: var(--text-3);
-}
-
-.wb-lite-line {
-  position: absolute;
-  top: 15px;
-  left: calc(-50% + 24px);
-  right: calc(50% + 24px);
-  height: 1.5px;
-  background: var(--border);
-}
-
-.wb-lite-node:first-child .wb-lite-line {
-  display: none;
-}
-
-.wb-lite-lbl {
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  color: var(--text-1);
-}
-
-.wb-lite-opt {
-  font-weight: 400;
-  color: var(--text-4);
-}
-
-.wb-lite-desc {
-  font-size: var(--fs-xs);
-  color: var(--text-4);
-  margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.wb-lite-skip {
-  display: inline-block;
-  font-size: 11px;
-  color: var(--text-4);
-  border: 1px dashed var(--border);
-  border-radius: 999px;
-  padding: 0 7px;
-  line-height: 16px;
-  margin-top: 4px;
-  background: #fafafa;
-}
-
-.wb-lite-pills {
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-  margin-top: 6px;
-  flex-wrap: wrap;
 }
 
 /* ---------- 需求澄清：文档面板 ---------- */
@@ -2021,16 +1948,7 @@ body {
   color: var(--text-4);
 }
 
-@media (max-width: 1200px) {
-  .wb-flow {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 4px;
-  }
 
-  .wb-flow-side {
-    justify-content: flex-end;
-  }
 }
 
 /* ---------- 对话区 ---------- */
@@ -2039,21 +1957,6 @@ body {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-}
-
-.req-brief {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-light);
-  background: var(--bg-soft);
-}
-
-.req-desc {
-  color: var(--text-3);
-  font-size: var(--fs-xs);
-  margin-top: 4px;
-  max-height: 54px;
-  overflow: auto;
-  white-space: pre-wrap;
 }
 
 .chat-scroll {
@@ -2420,9 +2323,9 @@ pre.diff {
 }
 
 @media (max-width: 1100px) {
-  .wb-body {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(240px, 42%) 1fr;
+  /* 窄屏：左栏收窄到 36%，仍保持左右分栏（文件区改单列查看） */
+  .wb-left {
+    width: 36% !important;
   }
 }
 
@@ -2430,11 +2333,6 @@ pre.diff {
   .lg-mt-0 {
     margin-top: 16px !important;
   }
-}
-
-/* ---------- 工作台：用例配置阶段单栏布局 ---------- */
-.wb-body.wb-solo {
-  grid-template-columns: 1fr;
 }
 
 /* ---------- 步骤引导条：上一步完成后的下一步提示 ---------- */
@@ -3300,4 +3198,231 @@ pre.diff {
   background: #f7f8fa;
   border-radius: 10px;
   resize: vertical;
+}
+
+/* ---------- 左栏固定文件区：竖向分类页签 + 分类内横向子页签 ---------- */
+.wfa {
+  display: flex;
+  width: 100%;
+  /* 高度链必须接通：wb-left 定高 → wfa 满高 → wfa-main 满高，
+     否则 doc-editor 的 flex:1 失效，编辑器只剩内容自然高度 */
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.wfa-rail {
+  flex: none;
+  width: 72px;
+  border-right: 1px solid var(--border-light);
+  background: linear-gradient(180deg, var(--bg-soft), #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 6px;
+}
+
+.wfa-rail-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 2px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  color: var(--text-3);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.wfa-rail-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.wfa-rail-item.is-active {
+  background: linear-gradient(180deg, #eef4ff, #e6efff);
+  border-color: #c9d8ff;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.wfa-rail-icon {
+  font-size: 15px;
+  display: inline-flex;
+}
+
+.wfa-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- 右栏：流程指令清单（替代旧步骤条） ---------- */
+.flow-cmds {
+  flex: none;
+  border-bottom: 1px solid var(--border-light);
+  background: linear-gradient(180deg, #f7faff, #fbfdff);
+}
+
+.fc-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  font-size: 13px;
+  color: var(--text-3);
+  user-select: none;
+}
+
+.fc-head-icon {
+  color: var(--primary);
+}
+
+.fc-head-title {
+  font-weight: 600;
+  color: var(--primary-deep);
+}
+
+.fc-head-hint {
+  font-size: 12px;
+  color: var(--text-4);
+}
+
+.fc-head-caret {
+  margin-left: auto;
+  font-size: 10px;
+  transition: transform 0.15s;
+}
+
+.flow-cmds.closed .fc-head-caret {
+  transform: rotate(180deg);
+}
+
+.flow-cmds.closed .fc-body {
+  display: none;
+}
+
+.fc-body {
+  padding: 0 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.fc-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-4);
+  margin: 5px 4px 1px;
+}
+
+.fc-group-cur {
+  font-size: 10.5px;
+  color: var(--primary);
+  background: #eef4ff;
+  border-radius: 5px;
+  padding: 1px 6px;
+  font-weight: 600;
+}
+
+.fc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text-1);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.fc-row:hover:not(:disabled) {
+  border-color: #b9ceff;
+  box-shadow: 0 2px 8px rgba(51, 112, 255, 0.12);
+}
+
+.fc-row:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.fc-num {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #eef4ff;
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.fc-name {
+  flex: none;
+  font-weight: 600;
+}
+
+.fc-desc {
+  flex: 1;
+  min-width: 0;
+  font-size: 11.5px;
+  color: var(--text-4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fc-st {
+  flex: none;
+  font-size: 11px;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-weight: 550;
+}
+
+.fc-st.is-done {
+  background: #e8f7ec;
+  color: var(--success-strong);
+}
+
+.fc-st.is-next {
+  background: #eef4ff;
+  color: var(--primary);
+}
+
+.fc-st.is-todo {
+  background: #f2f3f5;
+  color: var(--text-4);
+}
+
+.fc-row.is-done {
+  opacity: 0.78;
+}
+
+.fc-row.is-done .fc-num {
+  background: #e8f7ec;
+  color: var(--success-strong);
+}
+
+.fc-row.is-next {
+  border-color: #9db9ff;
+  box-shadow: 0 0 0 2px rgba(51, 112, 255, 0.13);
 }

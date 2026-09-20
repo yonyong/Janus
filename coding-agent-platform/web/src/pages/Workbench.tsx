@@ -1,24 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { App as AntdApp, Badge, Button, Dropdown, Space, Tag, Typography } from 'antd'
+import { App as AntdApp, Button, Dropdown, Space, Tag, Typography } from 'antd'
 import {
   ArrowLeftOutlined,
-  CodeOutlined,
   DownOutlined,
-  ExperimentOutlined,
-  FolderOutlined,
-  HistoryOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
   PauseCircleOutlined,
   PlusOutlined,
-  SwapOutlined,
 } from '@ant-design/icons'
 import { useToken } from '../auth'
 import {
   Message,
   Requirement,
-  ReqMode,
   SessionDetail,
   Stage,
+  STAGE_LABELS,
   TestCase,
   WorkflowState,
   abortSessionRun,
@@ -33,113 +30,22 @@ import {
   sessionMessages,
   setRequirementStage,
   streamEvents,
-  updateRequirement,
 } from '../api'
-import type { QuickCommand, RequirementPaneHandle } from '../components/RequirementPane'
-import WorkflowSteps from '../components/WorkflowSteps'
-import RequirementDocPane from '../components/RequirementDocPane'
-import CasePane from '../components/CasePane'
-import ArchivePane from '../components/ArchivePane'
-import FilePane from '../components/FilePane'
-import ChangePane from '../components/ChangePane'
+import type { RequirementPaneHandle } from '../components/RequirementPane'
+import { buildFlowCommands, verifyCasesPrompt } from '../components/FlowCommands'
+import type { FlowCommand } from '../components/FlowCommands'
+import FlowCommands from '../components/FlowCommands'
+import FileWorkArea from '../components/FileWorkArea'
 import RequirementPane from '../components/RequirementPane'
-import CodePane from '../components/CodePane'
-import TestPane from '../components/TestPane'
 
 /**
- * 需求澄清阶段的常用指令：与编码阶段同款引导卡，把原来「AI 润色」「AI 生成设计」
- * 两个一次性按钮改成走对话——结果直接落到工作区规范路径，
- * 编辑器实时轮询工作区自动载入最新内容，无需手动同步。
- */
-const buildClarifyQuickCommands = (dir: string): QuickCommand[] => {
-  const base = dir ? `.janus/${dir}` : '.janus'
-  return [
-    {
-      label: '润色需求文档',
-      desc: 'Agent 读取原始需求文档，润色后写回原文件',
-      text:
-        `请阅读项目目录下的 ${base}/requirement/origin.md（原始需求文档），` +
-        '把它润色成结构清晰、可直接执行的中文 Markdown 需求说明：' +
-        '用「背景 / 目标 / 功能点 / 验收要点」组织内容，保留原意与全部关键信息，' +
-        '信息不全用「待确认」标注，不要臆测功能；' +
-        `把润色后的全文写回 ${base}/requirement/origin.md，并在回复中给出全文。`,
-    },
-    {
-      label: '生成详细设计',
-      desc: 'Agent 通读需求、附件与项目代码，产出详细设计文档',
-      text:
-        `请先阅读项目目录下的 ${base}/requirement/origin.md（原始需求文档），浏览项目目录与相关代码，` +
-        '并阅读需求附件（如 .janus 需求目录的 requirement/attach/ 下有附件），产出一份详细设计文档，' +
-        '供编码 Agent 照着实现：必须包含「背景与目标、现状分析、总体方案、涉及文件清单、实现步骤、测试与验证方式」小节，' +
-        '方案落到具体文件与函数级别，信息不全用「待确认」标注；' +
-        `把文档全文写入 ${base}/requirement/design.md，并在回复中给出全文。`,
-    },
-  ]
-}
-
-/**
- * 用例配置阶段的常用指令：对话流式输出没有超时上限，慢模型也能跑完。
- * Agent 把用例草稿（```json 数组）写进工作区 cases-draft.md，对话结束后平台
- * 自动把草稿导入用例列表（同名条目跳过，导入即删草稿）。
- */
-/** 生成用例的完整指令（快捷指令与用例空态的「一键生成用例」共用同一段话术）。 */
-const verifyCasesPrompt = (dir: string): string => {
-  const base = dir ? `.janus/${dir}` : '.janus'
-  return (
-    `请先阅读项目目录下的 ${base}/requirement/origin.md（原始需求文档）与 ${base}/requirement/design.md（详细设计文档，若存在），` +
-    '以资深测试工程师视角设计功能验证用例：覆盖主流程、边界与异常路径，每条只验证一个点，标题简洁明确；' +
-    '把用例以一个 ```json 代码块（对象数组，字段固定为 title / steps / expected，steps 多步用换行分隔）' +
-    `写入 ${base}/usecase/cases-draft.md（文件内容只有这个代码块，不要写其他内容）；` +
-    '写完后在回复里逐条列出用例标题（平台会在对话结束后把草稿自动导入用例列表）。'
-  )
-}
-
-const buildVerifyQuickCommands = (dir: string): QuickCommand[] => {
-  return [
-    {
-      label: '生成单测用例',
-      desc: 'Agent 通读需求与设计文档，把用例草稿写入工作区，结束后自动导入用例列表',
-      text: verifyCasesPrompt(dir),
-    },
-  ]
-}
-
-/**
- * 编码实现阶段的常用指令：路径按需求目录动态生成（.janus/{需求目录}/...，
- * 目录名 = 需求名称，创建后固定），Agent 按路径直接读，避免它去猜
- * 「设计文档」「配置的单测」是哪些文件。
- * 后端在保存文档 / 配置用例时已把这些文件镜像到 .janus/ 下（见 backend/docs.py）。
- */
-const buildQuickCommands = (dir: string): QuickCommand[] => {
-  const base = dir ? `.janus/${dir}` : '.janus'
-  return [
-    {
-      label: '按设计文档实现需求',
-      desc: 'Agent 先读需求文档与设计文档，实现后逐条执行配置的单测',
-      text:
-        `请先阅读项目目录下的 ${base}/requirement/origin.md（原始需求文档）与 ${base}/requirement/design.md（详细设计文档），` +
-        '严格按详细设计文档实现这个需求，不要改动与该需求无关的其他文件；' +
-        `实现过程中的说明性文档（实现说明、决策记录等）写入 ${base}/other/ 目录；` +
-        `实现完成后，按 ${base}/usecase/usercase.md 中配置的单测逐条执行，确保全部验证通过；` +
-        `执行结果用 Markdown 表格逐条记录（表头：用例 | 标题 | 结果 | 说明，结果列只能取：通过 / 失败 / 跳过 / 未执行），` +
-        `写入 ${base}/arch/test-result.md——平台会解析该表格自动回写用例状态，务必严格按表格格式输出。`,
-    },
-    {
-      label: '执行配置的单测',
-      desc: '跑用例配置里的全部单测，汇总测试报告并汇报结论',
-      text:
-        `请执行项目目录下 ${base}/usecase/usercase.md 中配置的全部单测，逐条运行并确保验证通过；` +
-        '只处理与这些用例相关的文件，完成后把每条用例的执行结果用 Markdown 表格逐条汇总' +
-        '（表头：用例 | 标题 | 结果 | 说明，结果列只能取：通过 / 失败 / 跳过 / 未执行），' +
-        `写入 ${base}/arch/test-result.md——平台会解析该表格自动回写用例状态，务必严格按表格格式输出，并向我汇报结论。`,
-    },
-  ]
-}
-
-/**
- * 沉浸式工作台：顶部是工作流节点（需求澄清 → 用例配置 → 编码实现 → 归档验收），
- * 左侧随阶段切换（双文档 / 用例配置 / 文件树 / 归档汇总）。
- * 需求澄清、用例配置与编码实现右侧是对话；归档验收是纯操作页（左栏全宽）。
+ * 沉浸式工作台（2026-09 重设计版）：
+ * - 顶部一条栏：返回 / 标题 / 会话·项目·Agent 元信息 / 当前阶段 chip / 运行状态。
+ *   旧的工作流步骤条与标准/轻量模式切换已移除，阶段感知由右侧「流程指令」清单承载。
+ * - 左栏固定文件区（FileWorkArea）：竖向分类（需求文档 / 用例 / 归档 / 项目文件）+
+ *   分类内横向子页签，按 .janus/{dir}/ 存储规范映射；分栏支持拖拽调宽与收起。
+ * - 右栏：流程指令清单（跨阶段连续编号、已完成打标）+ Agent 对话。
+ *   归档验收不再是独立页面，汇总与验收操作在「归档」分类里完成。
  * 侧边菜单与顶部菜单由 App 在该路由下隐藏，退出靠左上角返回。
  */
 export default function Workbench() {
@@ -156,8 +62,6 @@ export default function Workbench() {
   const [cases, setCases] = useState<TestCase[]>([])
   const [casesLoading, setCasesLoading] = useState(false)
   const [stage, setStage] = useState<Stage>('clarify')
-  // 编码实现阶段左栏的当前页签（文件 / 改动 / 测试 / 编码）
-  const [buildTab, setBuildTab] = useState<'files' | 'changes' | 'test' | 'code'>('files')
   const [conv, setConv] = useState<{ role: string; content: string }[]>([])
   // 流式输出：一次运行中 Agent 的全部输出（各轮流式正文 + 最终答复）都汇总进
   // 同一条气泡（streamText 实时追加），done 时整体转正为一条对话消息；
@@ -173,8 +77,14 @@ export default function Workbench() {
   const esRef = useRef<EventSource | null>(null)
   // 用户是否手动点过工作流节点：点过之后，迟到的加载结果不得把阶段覆盖回去
   const stagePicked = useRef(false)
-  /** 右侧对话窗格：快捷指令 / 一键生成用例都只灌入输入框，由用户手动发送。 */
+  /** 右侧对话窗格：流程指令都只灌入输入框，由用户手动发送。 */
   const paneRef = useRef<RequirementPaneHandle | null>(null)
+
+  // 左栏宽度（px）：null = 跟随默认 42%；支持拖拽调宽与一键收起
+  const [leftPx, setLeftPx] = useState<number | null>(null)
+  const [leftCollapsed, setLeftCollapsed] = useState(false)
+  const draggingRef = useRef(false)
+  const bodyRef = useRef<HTMLDivElement | null>(null)
 
   // 项目 id 优先取会话详情，URL 参数只作兜底（旧链接、详情接口失败时仍能显示文件面板）
   const pidParam = params.get('pid')
@@ -290,51 +200,25 @@ export default function Workbench() {
 
   // ---------------- 步骤引导 ----------------
 
-  // 当前阶段的快捷指令（同时用于把发出的指令文本映射回 label，供完成后给出下一步引导）
-  const quickCommands = useMemo(() => {
-    const dir = requirement?.dir_name || ''
-    if (stage === 'build') return buildQuickCommands(dir)
-    if (stage === 'verify') return buildVerifyQuickCommands(dir)
-    return buildClarifyQuickCommands(dir)
-  }, [stage, requirement?.dir_name])
-
-  // 一次运行结束后的下一步引导：文本 + 可选的「进入下一环节」按钮 / 高亮的快捷指令。
-  // 发送新消息或切换阶段时清除。
-  const [stepHint, setStepHint] = useState<{
-    text: string
-    actionLabel?: string
-    actionStage?: Stage
-    highlight?: string
-  } | null>(null)
+  // 一次运行结束后的下一步引导（纯提示，操作入口统一在流程指令清单的高亮上）
+  const [stepHint, setStepHint] = useState<{ text: string } | null>(null)
 
   const stepHintAfterDone = useCallback((stageAtSend: Stage, label: string) => {
     if (stageAtSend === 'clarify') {
       if (label === '润色需求文档') {
-        setStepHint({ text: '需求文档已润色完成，接下来建议「生成详细设计」', highlight: '生成详细设计' })
+        setStepHint({ text: '需求文档已润色完成，接下来建议执行「生成详细设计」' })
       } else if (label === '生成详细设计') {
-        setStepHint({
-          text: '详细设计已生成，可以进入下一环节「用例配置」，为验收配置测试用例',
-          actionLabel: '进入用例配置',
-          actionStage: 'verify',
-        })
+        setStepHint({ text: '详细设计已生成，接下来建议配置测试用例「生成单测用例」' })
       }
     } else if (stageAtSend === 'verify') {
       if (label === '生成单测用例') {
-        setStepHint({
-          text: '用例草稿已生成并自动导入，确认用例后可进入「编码实现」',
-          actionLabel: '进入编码实现',
-          actionStage: 'build',
-        })
+        setStepHint({ text: '用例草稿已生成并自动导入，确认用例后可开始「按设计文档实现需求」' })
       }
     } else if (stageAtSend === 'build') {
       if (label === '按设计文档实现需求') {
-        setStepHint({ text: '实现完成，建议执行「执行配置的单测」验证结果', highlight: '执行配置的单测' })
+        setStepHint({ text: '实现完成，建议执行「执行配置的单测」验证结果' })
       } else if (label === '执行配置的单测') {
-        setStepHint({
-          text: '测试执行完毕，可进入「归档验收」查看需求全貌并归档',
-          actionLabel: '进入归档验收',
-          actionStage: 'archive',
-        })
+        setStepHint({ text: '测试执行完毕，可在「归档」分类查看测试报告并给出验收结论' })
       }
     }
   }, [])
@@ -357,44 +241,6 @@ export default function Workbench() {
     }
   }
 
-  /** 切换工作流模式（标准 / 轻量）：只改渲染形态与归档提示口径，不动阶段与数据。 */
-  const [switchingMode, setSwitchingMode] = useState(false)
-  const changeMode = async (m: ReqMode) => {
-    if (rid === null || requirement?.mode === m) return
-    setSwitchingMode(true)
-    try {
-      const r = await updateRequirement(token, rid, { mode: m })
-      setRequirement(r)
-      await loadFlow(true)
-      message.success(m === 'lite' ? '已切换为轻量流程：澄清与用例变为可选' : '已切换为标准流程')
-    } catch (e) {
-      const i = describeError(e)
-      message.error(`${i.title}${i.detail ? '：' + i.detail : ''}`)
-    } finally {
-      setSwitchingMode(false)
-    }
-  }
-
-  const modeMenu = (
-    <Dropdown
-      trigger={['click']}
-      disabled={busy}
-      menu={{
-        selectable: true,
-        selectedKeys: [requirement?.mode === 'lite' ? 'lite' : 'full'],
-        items: [
-          { key: 'full', label: '标准流程（澄清 → 用例 → 编码 → 归档）' },
-          { key: 'lite', label: '轻量流程（定义可选 → 编码 → 归档）' },
-        ],
-        onClick: ({ key }) => void changeMode(key as ReqMode),
-      }}
-    >
-      <Button size="small" icon={<SwapOutlined />} loading={switchingMode}>
-        {requirement?.mode === 'lite' ? '轻量流程' : '标准流程'}
-      </Button>
-    </Dropdown>
-  )
-
   /**
    * 订阅一次 agent 运行的 SSE 流。用户点击发送与「刷新/断线后续传」共用：
    * 后端以 (session, message) 幂等，重连同一消息会续传同一 run，并从事件 0
@@ -411,7 +257,8 @@ export default function Workbench() {
     setStreamText('')
     setStatusText('')
     const stageAtSend = stage
-    const label = quickCommands.find((c) => c.text === text)?.label || ''
+    const label =
+      buildFlowCommands(requirement?.dir_name || '').find((c) => c.text === text)?.label || ''
     const es = streamEvents(sessionId, text, token)
     esRef.current = es
     es.onmessage = async (ev) => {
@@ -584,6 +431,7 @@ export default function Workbench() {
       ),
     }))
     return [...items, { type: 'divider' as const }, { key: 'new', icon: <PlusOutlined />, label: '新建会话' }]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flow, sessionId])
 
   const onPickSession = ({ key }: { key: string }) => {
@@ -595,7 +443,37 @@ export default function Workbench() {
     if (Number.isFinite(target)) gotoSession(target)
   }
 
+  /** 点击流程指令：切到对应阶段上下文 + 把话术灌入输入框（归档指令只切阶段）。 */
+  const useCommand = (cmd: FlowCommand) => {
+    if (busy) return
+    setStepHint(null)
+    if (cmd.stage !== stage) void changeStage(cmd.stage)
+    if (cmd.text) paneRef.current?.loadDraft(cmd.text)
+  }
+
   const title = requirement?.title || info?.requirement?.title || `会话 #${sid}`
+
+  // ---------------- 分栏拖拽 ----------------
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!draggingRef.current || !bodyRef.current) return
+      const rect = bodyRef.current.getBoundingClientRect()
+      const min = 320
+      const max = Math.round(rect.width * 0.62)
+      setLeftPx(Math.min(Math.max(e.clientX - rect.left - 10, min), max))
+    }
+    const onUp = () => {
+      draggingRef.current = false
+      document.body.classList.remove('wb-dragging')
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [])
 
   return (
     <div className="wb-immersive">
@@ -624,6 +502,13 @@ export default function Workbench() {
                 {info?.git_branch ? ` · ${info.git_branch}` : ''}
               </Tag>
             )}
+            <Tag
+              className="wb-stage-chip"
+              style={{ marginInlineEnd: 0, borderRadius: 999, paddingInline: 10 }}
+              title="当前阶段（由流程指令驱动推进）"
+            >
+              阶段：{STAGE_LABELS[stage]}
+            </Tag>
           </Space>
         </Space>
         <Space size={10}>
@@ -647,134 +532,85 @@ export default function Workbench() {
         </Space>
       </div>
 
-      <WorkflowSteps
-        stage={stage}
-        flow={flow}
-        busy={busy}
-        onChange={(s) => void changeStage(s)}
-        trailing={rid === null ? undefined : modeMenu}
-      />
-
-      <div className={`wb-body${stage === 'archive' ? ' wb-solo' : ''}`}>
-        <section className="wb-left">
-          {stage === 'clarify' && (
-            <RequirementDocPane
-              token={token}
-              pid={pid}
-              requirement={requirement}
-              onSaved={(r) => {
-                setRequirement(r)
-                void loadFlow(true)
-              }}
-            />
-          )}
-
-          {stage === 'build' && (
-            <div className="wb-tabs">
-              {/* 自定义 pill 页签：窄窗口下也永远四个全可见（antd Tabs 会把溢出的
-                  「测试/编码」折叠进「…」下拉，用户就找不到它们了） */}
-              <div className="wb-tabbar">
-                {(
-                  [
-                    { key: 'files', label: '文件', icon: <FolderOutlined />, badge: 0 },
-                    { key: 'changes', label: '改动', icon: <HistoryOutlined />, badge: 0 },
-                    { key: 'test', label: '测试', icon: <ExperimentOutlined />, badge: testEvents.length },
-                    { key: 'code', label: '编码', icon: <CodeOutlined />, badge: codeEvents.length },
-                  ] as const
-                ).map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    className={`wb-tab${buildTab === t.key ? ' is-active' : ''}`}
-                    onClick={() => setBuildTab(t.key)}
-                  >
-                    <span className="wb-tab-icon">{t.icon}</span>
-                    {t.label}
-                    {t.badge > 0 && <Badge count={t.badge} color="#3370ff" style={{ marginLeft: 2 }} />}
-                  </button>
-                ))}
-              </div>
-              <div className="wb-tabbody">
-                {buildTab === 'files' && (
-                  <FilePane pid={pid} token={token} diskPath={info?.disk_path} refreshSignal={fsSignal} />
-                )}
-                {buildTab === 'changes' && (
-                  <ChangePane
-                    token={token}
-                    pid={pid}
-                    sessionId={sessionId}
-                    refreshSignal={fsSignal}
-                    onReverted={() => {
-                      // 回退动了盘上的文件，文件树与看板都得重新读
-                      setFsSignal((n) => n + 1)
-                      void loadFlow(true)
-                    }}
-                  />
-                )}
-                {buildTab === 'test' && (
-                  <div className="pane-scroll">
-                    <TestPane events={testEvents} />
-                  </div>
-                )}
-                {buildTab === 'code' && (
-                  <div className="pane-scroll">
-                    <CodePane events={codeEvents} />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {stage === 'verify' && (
-            <CasePane
-              token={token}
-              rid={rid}
-              cases={cases}
-              loading={casesLoading}
-              onReload={(silent) => Promise.all([loadCases(silent), loadFlow(true)]).then(() => undefined)}
-              onAskAgent={
-                busy || !requirement
-                  ? undefined
-                  : () => paneRef.current?.loadDraft(verifyCasesPrompt(requirement?.dir_name || ''))
-              }
-            />
-          )}
-
-          {stage === 'archive' && (
-            <ArchivePane
-              token={token}
-              rid={rid}
-              flow={flow}
-              cases={cases}
-              onReload={(silent) => Promise.all([loadFlow(!silent), loadCases(true)]).then(() => undefined)}
-            />
-          )}
+      <div className={`wb-body${leftCollapsed ? ' wb-left-collapsed' : ''}`} ref={bodyRef}>
+        <section className="wb-left" style={leftCollapsed ? undefined : { width: leftPx ?? undefined }}>
+          <button
+            type="button"
+            className="wb-collapse-btn"
+            title={leftCollapsed ? '展开左栏' : '收起左栏'}
+            onClick={() => {
+              setLeftCollapsed(!leftCollapsed)
+              setLeftPx(null)
+            }}
+          >
+            {leftCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+          </button>
+          <div
+            className="wb-split"
+            title="拖拽调整左右宽度 · 双击恢复默认"
+            onMouseDown={(e) => {
+              if (leftCollapsed) return
+              draggingRef.current = true
+              document.body.classList.add('wb-dragging')
+              e.preventDefault()
+            }}
+            onDoubleClick={() => setLeftPx(null)}
+          >
+            <span className="wb-split-grip" />
+          </div>
+          <FileWorkArea
+            token={token}
+            pid={pid}
+            rid={rid}
+            stage={stage}
+            requirement={requirement}
+            flow={flow}
+            cases={cases}
+            casesLoading={casesLoading}
+            diskPath={info?.disk_path ?? undefined}
+            sessionId={sessionId}
+            refreshSignal={fsSignal}
+            onDocSaved={(r) => {
+              setRequirement(r)
+              void loadFlow(true)
+            }}
+            onReloadCases={async (silent) => {
+              await loadCases(!!silent)
+              await loadFlow(true)
+            }}
+            onReverted={() => {
+              // 回退动了盘上的文件，文件树与看板都得重新读
+              setFsSignal((n) => n + 1)
+              void loadFlow(true)
+            }}
+            onAskAgent={
+              busy || !requirement
+                ? undefined
+                : () => paneRef.current?.loadDraft(verifyCasesPrompt(requirement?.dir_name || ''))
+            }
+          />
         </section>
 
-        {/* 需求澄清 / 用例配置 / 编码实现有对话；归档验收是纯操作页，左栏独占全宽 */}
-        {(stage === 'clarify' || stage === 'verify' || stage === 'build') && (
-          <section className="wb-right">
-            <RequirementPane
-              ref={paneRef}
-              requirement={requirement}
-              messages={conv}
-              busy={busy}
-              streamText={streamText}
-              statusText={statusText}
-              onSend={send}
-              showBrief={stage !== 'clarify'}
-              quickCommands={quickCommands}
-              stepHint={stepHint}
-              onHintAction={
-                stepHint?.actionStage
-                  ? () => void changeStage(stepHint.actionStage as Stage)
-                  : undefined
-              }
-              onAbort={() => void abortRun()}
-              aborting={aborting}
-            />
-          </section>
-        )}
+        <section className="wb-right">
+          <FlowCommands
+            stage={stage}
+            flow={flow}
+            dir={requirement?.dir_name || ''}
+            busy={busy}
+            onUse={useCommand}
+          />
+          <RequirementPane
+            ref={paneRef}
+            messages={conv}
+            busy={busy}
+            streamText={streamText}
+            statusText={statusText}
+            onSend={send}
+            stepHint={stepHint}
+            onAbort={() => void abortRun()}
+            aborting={aborting}
+          />
+        </section>
       </div>
     </div>
   )
