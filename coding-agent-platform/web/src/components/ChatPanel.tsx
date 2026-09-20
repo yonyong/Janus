@@ -59,6 +59,14 @@ const ChatPanel = forwardRef<
     focus: () => taRef.current?.focus(),
   }))
 
+  /** 给无名文件（粘贴的截图常无文件名）按 MIME 类型补一个带扩展名的名字，
+   *  这样落盘后能按后缀识别为图片并预览。 */
+  const namedFile = (f: File, i: number): File => {
+    if (f.name) return f
+    const sub = (f.type.split('/')[1] || 'bin').replace('jpeg', 'jpg').replace('svg+xml', 'svg')
+    return new File([f], `pasted-${Date.now()}-${i}.${sub}`, { type: f.type })
+  }
+
   const doUpload = async (files: File[]) => {
     if (!files.length) return
     if (!onUpload) {
@@ -67,7 +75,7 @@ const ChatPanel = forwardRef<
     }
     setUploading(true)
     try {
-      const rows = await onUpload(files)
+      const rows = await onUpload(files.map(namedFile))
       setAtts((cur) => [...cur, ...rows])
     } catch (e: any) {
       message.error('文件上传失败：' + String(e?.message || e))
@@ -77,7 +85,18 @@ const ChatPanel = forwardRef<
   }
 
   const onPaste = (e: React.ClipboardEvent) => {
-    const files = Array.from(e.clipboardData?.files || [])
+    const dt = e.clipboardData
+    if (!dt) return
+    // 粘贴的文件可能在 files（拷贝的文件）里，也可能只在 items（截图等图片 blob）里
+    let files = Array.from(dt.files || [])
+    if (files.length === 0 && dt.items) {
+      for (const it of Array.from(dt.items)) {
+        if (it.kind === 'file') {
+          const f = it.getAsFile()
+          if (f) files.push(f)
+        }
+      }
+    }
     if (files.length) {
       // 有文件（含截图）时拦下默认粘贴，改为上传；纯文本粘贴不受影响
       e.preventDefault()
