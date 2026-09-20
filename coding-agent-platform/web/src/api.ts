@@ -607,6 +607,55 @@ export interface AcceptRunResult {
   sync?: { found: boolean; rows: number; updated: number; stats: Record<string, number> } | null
 }
 
+/** 通用脚本参数定义（来自 YAML frontmatter）。 */
+export interface ScriptParamDef {
+  name: string
+  label: string
+  type: 'string' | 'number' | 'boolean'
+  default?: string | number | boolean | null
+  required?: boolean
+}
+
+/** 列表项 / 详情共用的脚本元信息。 */
+export interface ScriptItem {
+  name: string
+  display_name: string
+  desc: string
+  params: ScriptParamDef[]
+  lang: string
+  mtime?: string
+  path?: string
+  last_params?: Record<string, string>
+  run_count?: number
+  content?: string
+  body?: string
+}
+
+export interface ScriptRunRecord {
+  id: string
+  started_at: string
+  exit_code: number
+  params: Record<string, string>
+  output: string
+  duration_ms: number
+  truncated?: boolean
+}
+
+export interface ScriptRunResult {
+  ran: boolean
+  reason?: string
+  detail?: string
+  entry?: string
+  exit_code?: number
+  output?: string
+  truncated?: boolean
+  timeout?: number
+  lang?: string
+  duration_ms?: number
+  run?: ScriptRunRecord
+  last_params?: Record<string, string>
+}
+
 export interface ChangedFile {
   status: string
   path: string
@@ -703,6 +752,40 @@ export const runAcceptScript = (token: string | null, rid: number) =>
   req(buildUrl(`/api/requirements/${rid}/accept-script/run`, token), {
     method: 'POST',
   }) as Promise<AcceptRunResult>
+
+/** 通用脚本列表（.janus/{dir}/script/）。 */
+export const listScripts = (token: string | null, rid: number) =>
+  req(buildUrl(`/api/requirements/${rid}/scripts`, token)) as Promise<ScriptItem[]>
+
+export const getScript = (token: string | null, rid: number, name: string) =>
+  req(buildUrl(`/api/requirements/${rid}/scripts/${encodeURIComponent(name)}`, token)) as Promise<ScriptItem>
+
+export const saveScript = (token: string | null, rid: number, name: string, content: string) =>
+  req(buildUrl(`/api/requirements/${rid}/scripts/${encodeURIComponent(name)}`, token), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  }) as Promise<ScriptItem>
+
+export const deleteScript = (token: string | null, rid: number, name: string) =>
+  req(buildUrl(`/api/requirements/${rid}/scripts/${encodeURIComponent(name)}`, token), {
+    method: 'DELETE',
+  }) as Promise<{ ok: boolean }>
+
+export const runScript = (
+  token: string | null,
+  rid: number,
+  name: string,
+  params: Record<string, string | number | boolean> = {},
+) =>
+  req(buildUrl(`/api/requirements/${rid}/scripts/${encodeURIComponent(name)}/run`, token), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ params }),
+  }) as Promise<ScriptRunResult>
+
+export const listScriptRuns = (token: string | null, rid: number, name: string) =>
+  req(buildUrl(`/api/requirements/${rid}/scripts/${encodeURIComponent(name)}/runs`, token)) as Promise<ScriptRunRecord[]>
 
 export const createCase = (token: string | null, rid: number, body: CaseInput) =>
   req(buildUrl(`/api/requirements/${rid}/cases`, token), {
@@ -1053,6 +1136,13 @@ export interface DirListing {
   limit: number
 }
 
+export interface FileSearchResult {
+  query: string
+  entries: FileEntry[]
+  truncated: boolean
+  limit: number
+}
+
 export interface FileContent {
   path: string
   size: number
@@ -1065,6 +1155,10 @@ export interface FileContent {
 /** 列出一个目录的直接子项；path 为空表示项目根目录。 */
 export const listFiles = (token: string | null, pid: number, path: string) =>
   req(buildUrl(`/api/projects/${pid}/files`, token, { path })) as Promise<DirListing>
+
+/** 全工作区文件名模糊检索（子串 + 子序列）。 */
+export const searchFiles = (token: string | null, pid: number, q: string, limit = 200) =>
+  req(buildUrl(`/api/projects/${pid}/files/search`, token, { q, limit })) as Promise<FileSearchResult>
 
 export const readFile = (token: string | null, pid: number, path: string) =>
   req(buildUrl(`/api/projects/${pid}/file`, token, { path })) as Promise<FileContent>

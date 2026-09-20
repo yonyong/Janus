@@ -24,13 +24,15 @@ from . import files as FS
 from . import snapshots as SN
 from . import test_report as TR
 from . import acceptance as ACC
+from . import scripts as SCR
 from .models import (AgentCreate, AgentUpdate, AgentReorderIn, AgentTestIn, ProjectCreate,
                      ProjectUpdate,
                      RequirementCreate,
                      TokenIssue, AdminTokenIssue, AdminTokenUpdate,
                      FileWriteIn, FileCreateIn, FileRenameIn,
                      RequirementUpdate, StageIn, CaseIn, CaseBulkIn, CaseBatchDeleteIn, CaseUpdate,
-                     ArchiveIn, AiTaskIn, STAGES, CASE_STATUSES, VERDICTS)
+                     ArchiveIn, AiTaskIn, ScriptSaveIn, ScriptRunIn,
+                     STAGES, CASE_STATUSES, VERDICTS)
 from . import ai_tasks as AI
 from .agent_runtime import AgentRegistry
 from .agent_test import probe_agent
@@ -1050,6 +1052,99 @@ def accept_script_run(rid: int, allowed: set = Depends(get_allowed),
     return {**result, "sync": sync}
 
 
+def _script_http(err: SCR.ScriptError) -> HTTPException:
+    return HTTPException(status_code=err.code, detail=err.message)
+
+
+@app.get("/api/requirements/{rid}/scripts")
+def scripts_list(rid: int, allowed: set = Depends(get_allowed),
+                 db: sqlite3.Connection = Depends(get_db)):
+    """列出 .janus/{dir}/script/ 下的通用脚本（含 params / last_params）。"""
+    req = _require_requirement(db, rid, allowed)
+    proj = _require_project(db, req["project_id"])
+    return SCR.list_scripts(proj["disk_path"], req.get("dir_name") or "")
+
+
+@app.get("/api/requirements/{rid}/scripts/{name}")
+def scripts_get(rid: int, name: str, allowed: set = Depends(get_allowed),
+                db: sqlite3.Connection = Depends(get_db)):
+    req = _require_requirement(db, rid, allowed)
+    proj = _require_project(db, req["project_id"])
+    try:
+        return SCR.read_script(proj["disk_path"], req.get("dir_name") or "", name)
+    except SCR.ScriptError as e:
+        raise _script_http(e) from e
+
+
+@app.put("/api/requirements/{rid}/scripts/{name}")
+def scripts_put(rid: int, name: str, body: ScriptSaveIn,
+                allowed: set = Depends(get_allowed),
+                db: sqlite3.Connection = Depends(get_db)):
+    req = _require_requirement(db, rid, allowed)
+    proj = _require_project(db, req["project_id"])
+    try:
+        saved = SCR.write_script(proj["disk_path"], req.get("dir_name") or "", name, body.content or "")
+    except SCR.ScriptError as e:
+        raise _script_http(e) from e
+    audit.log("requirement.script_save", target_type="requirement", target_id=rid,
+              target_name=req["title"], project_id=req["project_id"],
+              project_name=(proj or {}).get("name") or "",
+              detail={"name": name})
+    return saved
+
+
+@app.delete("/api/requirements/{rid}/scripts/{name}")
+def scripts_delete(rid: int, name: str, allowed: set = Depends(get_allowed),
+                   db: sqlite3.Connection = Depends(get_db)):
+    req = _require_requirement(db, rid, allowed)
+    proj = _require_project(db, req["project_id"])
+    try:
+        SCR.delete_script(proj["disk_path"], req.get("dir_name") or "", name)
+    except SCR.ScriptError as e:
+        raise _script_http(e) from e
+    audit.log("requirement.script_delete", target_type="requirement", target_id=rid,
+              target_name=req["title"], project_id=req["project_id"],
+              project_name=(proj or {}).get("name") or "",
+              detail={"name": name})
+    return {"ok": True}
+
+
+@app.post("/api/requirements/{rid}/scripts/{name}/run")
+def scripts_run(rid: int, name: str, body: ScriptRunIn,
+                allowed: set = Depends(get_allowed),
+                db: sqlite3.Connection = Depends(get_db)):
+    req = _require_requirement(db, rid, allowed)
+    proj = _require_project(db, req["project_id"])
+    try:
+        result = SCR.run_script(proj["disk_path"], req.get("dir_name") or "", name, body.params or {})
+    except SCR.ScriptError as e:
+        raise _script_http(e) from e
+    if not result.get("ran"):
+        audit.log("requirement.script_run", status="failure", target_type="requirement",
+                  target_id=rid, target_name=req["title"], project_id=req["project_id"],
+                  project_name=(proj or {}).get("name") or "",
+                  error=result.get("reason") or "run_failed",
+                  detail={"name": name})
+    else:
+        audit.log("requirement.script_run", target_type="requirement", target_id=rid,
+                  target_name=req["title"], project_id=req["project_id"],
+                  project_name=(proj or {}).get("name") or "",
+                  detail={"name": name, "exit_code": result.get("exit_code"),
+                          "duration_ms": result.get("duration_ms")})
+    return result
+
+
+@app.get("/api/requirements/{rid}/scripts/{name}/runs")
+def scripts_runs(rid: int, name: str, allowed: set = Depends(get_allowed),
+                 db: sqlite3.Connection = Depends(get_db)):
+    req = _require_requirement(db, rid, allowed)
+    proj = _require_project(db, req["project_id"])
+    try:
+        return SCR.list_runs(proj["disk_path"], req.get("dir_name") or "", name)
+    except SCR.ScriptError as e:
+        raise _script_http(e) from e
+
+
 @app.delete("/api/cases/{cid}")
 def delete_case(cid: int, allowed: set = Depends(get_allowed),
                 db: sqlite3.Connection = Depends(get_db)):
@@ -1852,6 +1947,19 @@ def list_project_files(pid: int, path: str = Query(""), allowed: set = Depends(g
     except FS.FsError as e:
         raise HTTPException(status_code=e.code, detail=e.message)
     return _fs_guard(FS.list_dir, root, rel)
+
+
+@app.get("/api/projects/{pid}/files/search")
+def search_project_files(pid: int, q: str = Query("", min_length=0),
+                         limit: int = Query(FS.MAX_SEARCH_RESULTS, ge=1, le=FS.MAX_SEARCH_RESULTS),
+                         allowed: set = Depends(get_allowed),
+                         db: sqlite3.Connection = Depends(get_db)):
+    """按文件名模糊检索整个工作区（子串 + 子序列），供 Files 面板搜索框。"""
+    root = _project_root(db, pid, allowed)
+    query = (q or "").strip()
+    if not query:
+        return {"query": "", "entries": [], "truncated": False, "limit": limit}
+    return _fs_guard(FS.search_files, root, query, limit)
 
 
 @app.get("/api/projects/{pid}/file")

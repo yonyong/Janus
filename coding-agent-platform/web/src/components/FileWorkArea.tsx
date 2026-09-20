@@ -5,6 +5,7 @@ import {
   HistoryOutlined,
   InboxOutlined,
   FileTextOutlined,
+  CodeOutlined,
   QuestionCircleOutlined,
 } from '@ant-design/icons'
 import { Badge } from 'antd'
@@ -14,15 +15,16 @@ import CasePane from './CasePane'
 import ArchivePane from './ArchivePane'
 import FilePane from './FilePane'
 import ChangePane from './ChangePane'
+import ScriptPane from './ScriptPane'
 import HelpPanel from './HelpPanel'
 
 /**
- * 左栏固定文件区：竖向分类页签（需求文档 / 用例 / 归档 / 项目文件 / 帮助）+
+ * 左栏固定文件区：竖向分类页签（需求 / Files / 脚本 / 用例 / 归档 / 帮助）+
  * 分类内的横向子页签。不再随阶段整体切换 —— 阶段只决定默认落在哪个分类。
- * 需求目录按 .janus/{dir}/ 存储规范映射：requirement/、usecase/、arch/。
- * 分类由父组件受控（Workbench owns cat），以支持快捷键切换（Alt+1~5）。
+ * 需求目录按 .janus/{dir}/ 存储规范映射：requirement/、script/、usecase/、arch/。
+ * 分类由父组件受控（Workbench owns cat），以支持快捷键切换（Alt+1~6）。
  */
-export type Cat = 'req' | 'cases' | 'arch' | 'code' | 'help'
+export type Cat = 'req' | 'code' | 'script' | 'cases' | 'arch' | 'help'
 
 export const STAGE_CAT: Record<Stage, Cat> = {
   clarify: 'req',
@@ -77,12 +79,13 @@ export default function FileWorkArea({
   // 测试结论看用例状态与归档汇总，编码事件看改动集，不再重复展示）
   const [codeTab, setCodeTab] = useState<'files' | 'changes'>('files')
 
-  // 分类顺序即 rail 顺序：需求文档 → 用例 → 归档 → 项目文件 → 帮助（item 9）
+  // 分类顺序即 rail 顺序：需求 → Files → 脚本 → 用例 → 归档 → 帮助
   const cats: { k: Cat; label: string; icon: React.ReactNode; badge: number }[] = [
-    { k: 'req', label: '需求文档', icon: <FileTextOutlined />, badge: 0 },
+    { k: 'req', label: '需求', icon: <FileTextOutlined />, badge: 0 },
+    { k: 'code', label: 'Files', icon: <FolderOutlined />, badge: flow?.change_sets.files ?? 0 },
+    { k: 'script', label: '脚本', icon: <CodeOutlined />, badge: 0 },
     { k: 'cases', label: '用例', icon: <ExperimentOutlined />, badge: flow?.cases.failed ?? 0 },
     { k: 'arch', label: '归档', icon: <InboxOutlined />, badge: 0 },
-    { k: 'code', label: '项目文件', icon: <FolderOutlined />, badge: flow?.change_sets.files ?? 0 },
     { k: 'help', label: '帮助', icon: <QuestionCircleOutlined />, badge: 0 },
   ]
 
@@ -97,7 +100,6 @@ export default function FileWorkArea({
             onClick={() => onCatChange(c.k)}
           >
             <span className="wfa-rail-icon">
-              {/* 角标挂在图标右上角，不用绝对定位盖文字（rail 宽度小，压在文字上会挤压） */}
               {c.badge > 0 ? (
                 <Badge count={c.badge} size="small" color="#f54a45" offset={[5, -3]}>
                   {c.icon}
@@ -116,34 +118,8 @@ export default function FileWorkArea({
           <RequirementDocPane token={token} pid={pid} requirement={requirement} onSaved={onDocSaved} />
         )}
 
-        {cat === 'cases' && (
-          <CasePane
-            token={token}
-            rid={rid}
-            dir={requirement?.dir_name || ''}
-            cases={cases}
-            loading={casesLoading}
-            onReload={onReloadCases}
-            onAskAgent={onAskAgent}
-            onUseCommand={onUseCommand}
-            onOpenFiles={() => onCatChange('code')}
-            refreshSignal={refreshSignal}
-          />
-        )}
-
-        {cat === 'arch' && (
-          <ArchivePane
-            token={token}
-            rid={rid}
-            flow={flow}
-            cases={cases}
-            onReload={(silent) => onReloadCases(silent)}
-          />
-        )}
-
         {cat === 'code' && (
           <div className="wb-tabs">
-            {/* 自定义 pill 页签：窄窗口下也永远全可见（antd Tabs 会把溢出的折叠进「…」） */}
             <div className="wb-tabbar">
               {(
                 [
@@ -178,6 +154,42 @@ export default function FileWorkArea({
               )}
             </div>
           </div>
+        )}
+
+        {cat === 'script' && (
+          <ScriptPane
+            token={token}
+            rid={rid}
+            dir={requirement?.dir_name || ''}
+            busy={busy}
+            refreshSignal={refreshSignal}
+            onUseCommand={onUseCommand}
+          />
+        )}
+
+        {cat === 'cases' && (
+          <CasePane
+            token={token}
+            rid={rid}
+            dir={requirement?.dir_name || ''}
+            cases={cases}
+            loading={casesLoading}
+            onReload={onReloadCases}
+            onAskAgent={onAskAgent}
+            onUseCommand={onUseCommand}
+            onOpenFiles={() => onCatChange('code')}
+            refreshSignal={refreshSignal}
+          />
+        )}
+
+        {cat === 'arch' && (
+          <ArchivePane
+            token={token}
+            rid={rid}
+            flow={flow}
+            cases={cases}
+            onReload={(silent) => onReloadCases(silent)}
+          />
         )}
 
         {cat === 'help' && (

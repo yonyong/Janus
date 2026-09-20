@@ -171,3 +171,13 @@ class AiTaskIn(BaseModel):
     timeout: float | None = None
     doc: str | None = None
     title: str | None = None
+
+
+class ScriptSaveIn(BaseModel):
+    """保存/新建通用脚本正文（可含 YAML frontmatter）。"""
+    content: str = ""
+
+
+class ScriptRunIn(BaseModel):
+    """执行通用脚本：params 为 frontmatter 声明的参数名→值。"""
+    params: dict = {}
