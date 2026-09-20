@@ -34,11 +34,12 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     group: '界面导航（左栏 Tab 切换）',
     items: [
-      { keys: ['Alt', '1'], desc: '需求文档' },
-      { keys: ['Alt', '2'], desc: '用例' },
-      { keys: ['Alt', '3'], desc: '归档' },
-      { keys: ['Alt', '4'], desc: '项目文件' },
-      { keys: ['Alt', '5'], desc: '帮助' },
+      { keys: ['Alt', '1'], desc: '需求' },
+      { keys: ['Alt', '2'], desc: 'Files' },
+      { keys: ['Alt', '3'], desc: '脚本' },
+      { keys: ['Alt', '4'], desc: '用例' },
+      { keys: ['Alt', '5'], desc: '归档' },
+      { keys: ['Alt', '6'], desc: '帮助' },
       { keys: ['Alt', 'B'], desc: '收起 / 展开左栏' },
     ],
   },

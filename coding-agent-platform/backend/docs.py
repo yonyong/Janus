@@ -119,6 +119,20 @@ def other_dir(dir_name: str) -> str:
     return f"{JANUS_DIR}/{dir_name}/other"
 
 
+def script_dir(dir_name: str) -> str:
+    """通用脚本目录：.janus/{dir}/script/（与 usecase/accept.* 验收脚本分离）。"""
+    return f"{JANUS_DIR}/{dir_name}/script"
+
+
+def script_file(dir_name: str, name: str) -> str:
+    return f"{JANUS_DIR}/{dir_name}/script/{name}"
+
+
+def script_runs_file(dir_name: str, stem: str) -> str:
+    """脚本执行记录：.janus/{dir}/script/.runs/{stem}.json。"""
+    return f"{JANUS_DIR}/{dir_name}/script/.runs/{stem}.json"
+
+
 def test_result_doc(dir_name: str) -> str:
     return f"{JANUS_DIR}/{dir_name}/arch/test-result.md"
 
@@ -147,6 +161,8 @@ def agent_context_brief(dir_name: str) -> str:
         f"- AI 用例草稿：{usecase_draft(dir_name)}（生成 / 补充功能验证用例一律写这里，"
         "文件内容为一个 ```json 代码块，对象数组字段 title/steps/expected，导入后平台会删除该文件）\n"
         f"- 编码过程文档（实现说明、决策记录等）：{other_dir(dir_name)}/ 下\n"
+        f"- 通用脚本：{script_dir(dir_name)}/ 下（可带 YAML frontmatter 声明 params；"
+        "与 usecase/accept.* 总验收脚本分离）\n"
         f"- 测试报告：{test_result_doc(dir_name)}（必须是 Markdown 表格，表头："
         "用例 | 标题 | 结果 | 说明；结果列每条用例只能取：通过 / 失败 / 跳过 / 未执行，"
         "平台会解析该表格自动回写用例状态，纯文字版报告无法被平台识别）\n\n"

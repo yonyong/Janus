@@ -15,6 +15,37 @@ import time
 MAX_READ = 512 * 1024
 # 单次列目录上限：node_modules 这种目录动辄数万项，超出即截断并告知前端。
 MAX_ENTRIES = 1000
+# 文件名模糊检索：最多返回条数 / 最多遍历节点数（防超大仓库拖垮请求）。
+MAX_SEARCH_RESULTS = 200
+MAX_SEARCH_VISIT = 20_000
+# 检索时跳过的重目录（与 FilePane 过滤 + 常见构建缓存对齐；.janus 仍可搜）。
+SEARCH_IGNORE_DIRS = {
+    ".git",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "env",
+    "dist",
+    "build",
+    ".next",
+    ".nuxt",
+    ".output",
+    "target",
+    "out",
+    ".idea",
+    ".vscode",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".tox",
+    ".cache",
+    "coverage",
+    "htmlcov",
+    ".gradle",
+    ".mvn",
+    ".DS_Store",
+}
 
 
 class FsError(Exception):
@@ -87,6 +118,95 @@ def _entry(abs_p: str, rel: str, name: str) -> dict:
         "size": size,
         "mtime": mtime,
         "ext": "" if is_dir else os.path.splitext(name)[1].lstrip(".").lower(),
+    }
+
+
+def fuzzy_name_score(name: str, query: str) -> int | None:
+    """文件名模糊匹配得分；不匹配返回 None。得分越高越靠前。
+
+    支持：连续子串（高分）+ 按序子序列（字符可以不连续，如 ``fp`` → ``FilePane``）。
+    """
+    q = (query or "").strip().lower()
+    if not q:
+        return None
+    n = (name or "").lower()
+    if not n:
+        return None
+    if q in n:
+        # 子串命中优先；更短文件名、更靠前出现加分
+        return 2000 + max(0, 200 - len(n)) + max(0, 100 - n.index(q) * 3)
+    score = 0
+    ni = qi = 0
+    streak = 0
+    while ni < len(n) and qi < len(q):
+        if n[ni] == q[qi]:
+            streak += 1
+            score += 12 + streak * 6
+            if ni == 0 or n[ni - 1] in "/._-":
+                score += 8
+            qi += 1
+        else:
+            streak = 0
+        ni += 1
+    if qi < len(q):
+        return None
+    return score
+
+
+def search_files(root: str, query: str, limit: int = MAX_SEARCH_RESULTS) -> dict:
+    """在工作区内递归模糊检索文件名（目录名也纳入），跳过 SEARCH_IGNORE_DIRS。"""
+    base = ensure_root(root)
+    q = (query or "").strip()
+    if not q:
+        return {"query": q, "entries": [], "truncated": False, "limit": limit}
+    cap = max(1, min(int(limit or MAX_SEARCH_RESULTS), MAX_SEARCH_RESULTS))
+    scored: list[tuple[int, dict]] = []
+    visited = 0
+    truncated = False
+    stack = [""]
+    while stack:
+        if visited >= MAX_SEARCH_VISIT:
+            truncated = True
+            break
+        rel_dir = stack.pop()
+        abs_dir = os.path.join(base, rel_dir) if rel_dir else base
+        try:
+            entries = sorted(os.scandir(abs_dir), key=lambda e: e.name)
+        except OSError:
+            continue
+        subdirs: list[str] = []
+        for e in entries:
+            visited += 1
+            if visited > MAX_SEARCH_VISIT:
+                truncated = True
+                break
+            rel = f"{rel_dir}/{e.name}" if rel_dir else e.name
+            try:
+                if e.is_dir(follow_symlinks=False):
+                    if e.name in SEARCH_IGNORE_DIRS:
+                        continue
+                    pts = fuzzy_name_score(e.name, q)
+                    if pts is not None:
+                        scored.append((pts, _entry(os.path.join(abs_dir, e.name), rel, e.name)))
+                    subdirs.append(rel)
+                elif e.is_file(follow_symlinks=False):
+                    pts = fuzzy_name_score(e.name, q)
+                    if pts is not None:
+                        scored.append((pts, _entry(os.path.join(abs_dir, e.name), rel, e.name)))
+            except OSError:
+                continue
+        if truncated:
+            break
+        for d in reversed(subdirs):
+            stack.append(d)
+    scored.sort(key=lambda x: (-x[0], x[1]["type"] != "dir", x[1]["name"].lower()))
+    if len(scored) > cap:
+        truncated = True
+    return {
+        "query": q,
+        "entries": [e for _, e in scored[:cap]],
+        "truncated": truncated,
+        "limit": cap,
     }
 
 

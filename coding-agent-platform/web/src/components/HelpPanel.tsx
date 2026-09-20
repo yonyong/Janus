@@ -30,7 +30,7 @@ const STAGE_LABEL: Record<string, string> = {
 const GUIDE_STEPS = [
   {
     t: '需求澄清',
-    d: '在「需求文档」里完善原始需求，让 Agent 润色并生成详细设计文档，作为后续编码依据。',
+    d: '在「需求」里完善原始需求，让 Agent 润色并生成详细设计文档，作为后续编码依据。',
   },
   { t: '用例配置', d: '让 Agent 生成功能验证用例草稿，平台自动导入到「用例」列表，可批量管理。' },
   { t: '编码实现', d: 'Agent 按详细设计实现需求；每次运行前后自动快照比对，改动落库、可逐条回退。' },
@@ -44,11 +44,15 @@ const FAQ = [
   },
   {
     q: '改动记录能回退吗？',
-    a: '可以。在「项目文件 → 改动」里可回退单个文件或整条记录；回退本身也会记一条记录，随时可再回退。二进制与超大文件只记指纹、不可回退。',
+    a: '可以。在「Files → 改动」里可回退单个文件或整条记录；回退本身也会记一条记录，随时可再回退。二进制与超大文件只记指纹、不可回退。',
   },
   {
     q: '常用指令里的路径为什么是 .janus/ 开头？',
-    a: '平台按 .janus/{需求目录}/ 组织需求文档、用例与测试报告；指令话术里已写好固定路径，Agent 无需自己猜测。',
+    a: '平台按 .janus/{需求目录}/ 组织需求文档、用例、通用脚本与测试报告；指令话术里已写好固定路径，Agent 无需自己猜测。',
+  },
+  {
+    q: '「脚本」和用例里的验收脚本有什么区别？',
+    a: '「脚本」Tab 管理 .janus/{dir}/script/ 下的通用可参数化脚本；用例面板的总验收脚本仍是 usecase/accept.*，专用于验收回写用例状态。',
   },
   {
     q: '新建会话会发生什么？',
@@ -94,7 +98,7 @@ export default function HelpPanel({
           <div className="help-section">
             <p className="help-lead">
               沉浸式工作台按「需求澄清 → 用例配置 → 编码实现 → 归档验收」四个阶段推进。
-              左栏切换各阶段的文档 / 用例 / 归档 / 项目文件，右栏始终是与编码 Agent 的对话。
+              左栏切换需求 / Files / 脚本 / 用例 / 归档 / 帮助，右栏始终是与编码 Agent 的对话。
             </p>
             <ol className="help-steps">
               {GUIDE_STEPS.map((s, i) => (
@@ -114,7 +118,7 @@ export default function HelpPanel({
           <div className="help-section">
             <p className="help-lead">点选指令即填入对话输入框，确认无误后手动发送。</p>
             <div className="help-cmds">
-              {cmds.map((c) => (
+              {cmds.map((c, i) => (
                 <button
                   key={c.label}
                   type="button"
@@ -124,6 +128,7 @@ export default function HelpPanel({
                   onClick={() => onUse(c.text)}
                 >
                   <span className="help-cmd-top">
+                    <span className="help-cmd-num">{i + 1}</span>
                     <span className="help-cmd-name">{c.label}</span>
                     <span className="help-cmd-stage">{STAGE_LABEL[c.stage] || c.stage}</span>
                   </span>
