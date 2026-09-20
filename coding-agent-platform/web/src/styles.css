@@ -1079,6 +1079,75 @@ body.wb-dragging .wb-split::after {
   white-space: nowrap;
 }
 
+/* 验收主操作条：生成脚本 / 执行验收 / 仅人工核对 + 脚本状态 */
+.case-accept {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.case-accept-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.case-accept-status {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.case-script-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.case-script-chip.is-none {
+  color: var(--text-4);
+  background: var(--bg-sunken);
+}
+
+.case-script-chip.is-stale {
+  color: var(--warning-strong);
+  background: var(--tint-danger);
+  border-color: var(--tint-primary-border);
+}
+
+.case-script-chip.is-ok {
+  color: var(--success-strong);
+  background: var(--tint-success);
+  border-color: var(--tint-primary-border);
+}
+
+.case-run-output {
+  margin: 0;
+  max-height: 56vh;
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-sunken);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-1);
+}
+
 .case-actions {
   flex: none;
   display: flex;

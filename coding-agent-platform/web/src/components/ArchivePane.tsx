@@ -141,14 +141,19 @@ export default function ArchivePane({
                     : `${stats?.passed ?? 0} / ${total} 条通过`}
               </span>
             </Space>
-            <Space size={4}>
+            <Space size={4} wrap>
               <Tag color="green" style={{ marginInlineEnd: 0 }}>
                 通过 {stats?.passed ?? 0}
               </Tag>
               <Tag color={(stats?.failed ?? 0) > 0 ? 'red' : 'default'} style={{ marginInlineEnd: 0 }}>
                 失败 {stats?.failed ?? 0}
               </Tag>
-              <Tag style={{ marginInlineEnd: 0 }}>未验证 {(stats?.pending ?? 0) + (stats?.skipped ?? 0)}</Tag>
+              <Tag style={{ marginInlineEnd: 0 }}>未跑 {(stats?.pending ?? 0) + (stats?.skipped ?? 0)}</Tag>
+              {(stats?.manual_pending ?? 0) > 0 && (
+                <Tag color="blue" style={{ marginInlineEnd: 0 }}>
+                  人工待核 {stats?.manual_pending}
+                </Tag>
+              )}
             </Space>
           </div>
 

@@ -560,6 +560,8 @@ export interface TestCase {
   status: CaseStatus
   note: string
   source: string
+  /** 人工验收项：不进总验收脚本，由人在页面上勾选。 */
+  is_manual?: boolean | number
   created_at?: string | null
   updated_at?: string | null
 }
@@ -571,6 +573,38 @@ export interface CaseStats {
   pending: number
   skipped: number
   done: number
+  /** 标了「人工」的用例数 / 其中尚未勾选结果的数（归档页「人工待核」）。 */
+  manual?: number
+  manual_pending?: number
+}
+
+/** 总验收脚本状态（一需求一份 accept.*）。 */
+export interface AcceptScriptStatus {
+  exists: boolean
+  path: string
+  name: string | null
+  mtime: string | null
+  stale: boolean
+  lang: string | null
+  coverage: {
+    known: boolean
+    covered_ids: number[]
+    uncovered_ids: number[]
+    uncovered: number
+  }
+}
+
+export interface AcceptRunResult {
+  ran: boolean
+  reason?: string
+  detail?: string
+  entry?: string
+  exit_code?: number
+  output?: string
+  truncated?: boolean
+  timeout?: number
+  lang?: string
+  sync?: { found: boolean; rows: number; updated: number; stats: Record<string, number> } | null
 }
 
 export interface ChangedFile {
@@ -657,7 +691,18 @@ export interface CaseInput {
   expected?: string
   status?: CaseStatus
   note?: string
+  is_manual?: boolean
 }
+
+/** 总验收脚本状态：是否存在、路径、是否过期、覆盖度。 */
+export const acceptScriptStatus = (token: string | null, rid: number) =>
+  req(buildUrl(`/api/requirements/${rid}/accept-script`, token)) as Promise<AcceptScriptStatus>
+
+/** 执行总验收脚本 → 解析测试报告回写用例状态。脚本不存在时 ran=false。 */
+export const runAcceptScript = (token: string | null, rid: number) =>
+  req(buildUrl(`/api/requirements/${rid}/accept-script/run`, token), {
+    method: 'POST',
+  }) as Promise<AcceptRunResult>
 
 export const createCase = (token: string | null, rid: number, body: CaseInput) =>
   req(buildUrl(`/api/requirements/${rid}/cases`, token), {

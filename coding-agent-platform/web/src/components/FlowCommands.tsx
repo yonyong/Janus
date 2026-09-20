@@ -60,6 +60,32 @@ export const verifyCasesPrompt = (dir: string): string => {
   )
 }
 
+/** 「生成/更新总验收脚本」指令：让 Agent 依据用例清单写一份可重复执行的 accept.py。 */
+export const acceptGeneratePrompt = (dir: string): string => {
+  const base = dir ? `.janus/${dir}` : '.janus'
+  return (
+    `请阅读项目目录下的 ${base}/usecase/usercase.md（用例清单，含每条用例的标题 / 预期 / 是否人工）、` +
+    `${base}/requirement/origin.md 与 ${base}/requirement/design.md，` +
+    `生成或更新「总验收脚本」写入 ${base}/usecase/accept.py（一需求一份，语言用 Python）：\n` +
+    '- 读取上述用例清单，跳过标记为「人工：是」的用例；\n' +
+    '- 按用例标题逐条执行检查；起服务 / 调接口 / 捞日志 / 查库等公共步骤在脚本里写一次，用例只对应差异点；\n' +
+    '- 把每条结果汇成 Markdown 表格（表头：用例 | 标题 | 结果 | 说明，结果列只能取 通过 / 失败 / 跳过 / 未执行）' +
+    `写入 ${base}/arch/test-result.md；\n` +
+    `- 脚本能被 \`python3 ${base}/usecase/accept.py\` 直接在项目根目录运行；脚本自身退出码 0 表示跑通` +
+    '（单条用例的成败以结果表为准）。不要修改用例清单本身。'
+  )
+}
+
+/** 「执行总验收脚本并写测试报告」指令（与「执行验收」按钮同义的对话版本）。 */
+export const acceptRunPrompt = (dir: string): string => {
+  const base = dir ? `.janus/${dir}` : '.janus'
+  return (
+    `请在项目根目录执行总验收脚本 \`python3 ${base}/usecase/accept.py\`，` +
+    `确保它把最新结果表写入 ${base}/arch/test-result.md（表头：用例 | 标题 | 结果 | 说明），` +
+    '并把脚本输出与整体结论回复给我。'
+  )
+}
+
 const buildCommands = (dir: string): FlowCommand[] => {
   const base = dir ? `.janus/${dir}` : '.janus'
   return [
@@ -69,6 +95,18 @@ const buildCommands = (dir: string): FlowCommand[] => {
       label: '生成单测用例',
       desc: 'Agent 生成用例草稿，对话结束自动导入用例列表',
       text: verifyCasesPrompt(dir),
+    },
+    {
+      stage: 'verify',
+      label: '生成/更新总验收脚本',
+      desc: '依据用例清单生成一份可重复执行的 accept.py',
+      text: acceptGeneratePrompt(dir),
+    },
+    {
+      stage: 'verify',
+      label: '执行总验收脚本并写测试报告',
+      desc: '让 Agent 跑脚本并把结果表写入 test-result.md',
+      text: acceptRunPrompt(dir),
     },
     {
       stage: 'build',
