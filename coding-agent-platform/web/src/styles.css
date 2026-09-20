@@ -2298,6 +2298,26 @@ body.wb-dragging .wb-split::after {
   min-height: 0;
 }
 
+/* 多 Agent 时：输入框上方可选当前会话使用的 Agent */
+.chat-agent-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 0;
+  background: var(--bg-elevated);
+}
+
+.chat-agent-bar-label {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
 /* Agent 回复 Markdown 渲染（对话气泡内，较 .fv-md 更紧凑） */
 .chat-md {
   font-size: var(--fs-sm);

@@ -18,10 +18,12 @@ import {
   STAGE_LABELS,
   TestCase,
   WorkflowState,
+  Agent,
   abortSessionRun,
   createSession,
   describeError,
   importCasesFromWorkspace,
+  listAgents,
   listCases,
   listRequirements,
   requirementWorkflow,
@@ -29,6 +31,7 @@ import {
   sessionDetail,
   sessionMessages,
   setRequirementStage,
+  setSessionAgent,
   streamEvents,
 } from '../api'
 import type { RequirementPaneHandle } from '../components/RequirementPane'
@@ -76,6 +79,9 @@ export default function Workbench() {
   const [busy, setBusy] = useState(false)
   // Agent 产出改动时自增，用于让文件面板静默刷新
   const [fsSignal, setFsSignal] = useState(0)
+  // 对话面板：多 Agent 时可选；列表按调度优先级排序
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [agentSwitching, setAgentSwitching] = useState(false)
   const esRef = useRef<EventSource | null>(null)
   // 用户是否手动点过工作流节点：点过之后，迟到的加载结果不得把阶段覆盖回去
   const stagePicked = useRef(false)
@@ -149,6 +155,21 @@ export default function Workbench() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sid, token])
+
+  // 对话面板 Agent 选择：拉全量列表（含可用状态），多于 1 个时展示下拉
+  useEffect(() => {
+    let active = true
+    listAgents()
+      .then((as) => {
+        if (active) setAgents(as)
+      })
+      .catch(() => {
+        if (active) setAgents([])
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   // 刷新 / 重进页面后，若该会话仍有后台 run 在跑（页面刷新不会杀死它），
   // 立即重新订阅把流式输出接回来，而不是等它跑完后才从历史记录里看到结果。
@@ -381,6 +402,23 @@ export default function Workbench() {
     if (busy) return
     setStepHint(null)
     runStream(text)
+  }
+
+  /** 切换本会话使用的 Agent；换 Agent 会清空 CLI 续聊上下文。 */
+  const changeAgent = async (agentId: number) => {
+    if (busy || agentSwitching) return
+    if (info?.agent?.id === agentId) return
+    setAgentSwitching(true)
+    try {
+      const r = await setSessionAgent(token, sessionId, agentId)
+      setInfo((prev) => (prev ? { ...prev, agent: r.agent, agent_id: r.agent_id } : prev))
+      message.success(r.agent ? `已切换到 ${r.agent.name}` : '已切换 Agent')
+    } catch (e) {
+      const i = describeError(e)
+      message.error(`${i.title}${i.detail ? '：' + i.detail : ''}`)
+    } finally {
+      setAgentSwitching(false)
+    }
   }
 
   /** 真中止当前运行：后端取消 run 任务并杀掉 CLI 子进程树，不是只关页面上的 SSE。
@@ -662,6 +700,10 @@ export default function Workbench() {
             stepHint={stepHint}
             onAbort={() => void abortRun()}
             aborting={aborting}
+            agents={agents}
+            agentId={info?.agent?.id ?? null}
+            onChangeAgent={(id) => void changeAgent(id)}
+            agentSwitching={agentSwitching}
           />
         </section>
       </div>

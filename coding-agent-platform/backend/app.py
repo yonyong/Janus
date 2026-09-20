@@ -31,7 +31,7 @@ from .models import (AgentCreate, AgentUpdate, AgentReorderIn, AgentTestIn, Proj
                      TokenIssue, AdminTokenIssue, AdminTokenUpdate,
                      FileWriteIn, FileCreateIn, FileRenameIn,
                      RequirementUpdate, StageIn, CaseIn, CaseBulkIn, CaseBatchDeleteIn, CaseUpdate,
-                     ArchiveIn, AiTaskIn, ScriptSaveIn, ScriptRunIn,
+                     ArchiveIn, AiTaskIn, ScriptSaveIn, ScriptRunIn, SessionAgentIn,
                      STAGES, CASE_STATUSES, VERDICTS)
 from . import ai_tasks as AI
 from .agent_runtime import AgentRegistry
@@ -1566,9 +1566,21 @@ def create_session(body: dict, db: sqlite3.Connection = Depends(get_db), token: 
     if req["project_id"] not in allowed:
         raise HTTPException(status_code=403, detail="无权访问该项目")
     proj = R.ProjectRepo.get(db, req["project_id"])
+    # 可选：新建会话时指定 agent；未传则按排序取第一个当日可用的
+    agent_id = body.get("agent_id")
+    if agent_id is not None:
+        try:
+            agent_id = int(agent_id)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="agent_id 必须是整数")
     # 建会话会在项目仓库里 checkout 新分支（见 SessionService.create），属于改仓库状态
     try:
-        out = S.SessionService.create(db, rid)
+        out = S.SessionService.create(db, rid, agent_id=agent_id)
+    except ValueError as e:
+        audit.log("session.create", status="failure", target_type="session",
+                  target_name=req["title"], project_id=req["project_id"],
+                  project_name=(proj or {}).get("name") or "", error=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
         audit.log("session.create", status="failure", target_type="session",
                   target_name=req["title"], project_id=req["project_id"],
@@ -1577,8 +1589,47 @@ def create_session(body: dict, db: sqlite3.Connection = Depends(get_db), token: 
     audit.log("session.create", target_type="session", target_id=out["id"],
               target_name=req["title"], project_id=req["project_id"],
               project_name=(proj or {}).get("name") or "",
-              detail={"requirement_id": rid, "git_branch": out.get("git_branch")})
+              detail={"requirement_id": rid, "git_branch": out.get("git_branch"),
+                      "agent_id": out.get("agent_id")})
     return out
+
+
+@app.patch("/api/sessions/{sid}/agent")
+def set_session_agent(sid: int, body: SessionAgentIn, db: sqlite3.Connection = Depends(get_db),
+                      token: str = Query(None), admin: str = Query(None)):
+    """切换会话当前使用的 coding agent（对话面板多 Agent 时可选）。
+
+    换 Agent 会清空 CLI 续聊 id，下一轮消息按新 Agent 重新起聊；
+    Agent 运行中禁止切换。
+    """
+    allowed = resolve_access(db, token, admin)
+    if allowed is None:
+        raise HTTPException(status_code=401, detail="无效或缺失访问令牌")
+    sess = R.SessionRepo.get(db, sid)
+    if sess is None:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    if sess["project_id"] not in allowed:
+        raise HTTPException(status_code=403, detail="无权访问该项目")
+    proj = R.ProjectRepo.get(db, sess["project_id"])
+    req = R.RequirementRepo.get(db, sess["requirement_id"])
+    try:
+        out = S.SessionService.set_agent(db, sid, body.agent_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    agent = R.AgentRepo.get(db, out["agent_id"])
+    audit.log("session.set_agent", target_type="session", target_id=sid,
+              target_name=(req or {}).get("title") or "",
+              project_id=sess["project_id"],
+              project_name=(proj or {}).get("name") or "",
+              detail={"agent_id": out.get("agent_id"),
+                      "agent_name": (agent or {}).get("name")})
+    return {
+        "id": out["id"],
+        "agent_id": out["agent_id"],
+        "agent": {"id": agent["id"], "name": agent["name"], "type": agent["type"]} if agent else None,
+    }
 
 
 @app.get("/api/sessions/{sid}")

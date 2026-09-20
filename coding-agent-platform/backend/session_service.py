@@ -84,6 +84,15 @@ class SessionService:
                     "没有可用的 coding agent（可能今日 Token 限额已用完）；"
                     "请先在「Agent 管理」调整限额或添加一个 agent"
                 )
+        else:
+            agent = R.AgentRepo.get(conn, agent_id)
+            if agent is None:
+                raise ValueError("Agent 不存在")
+            usage = R.AgentRepo.usage_map(conn)
+            if not R.AgentRepo.is_available(agent, usage.get(agent["id"], 0)):
+                raise RuntimeError(
+                    f"Agent「{agent['name']}」今日 Token 限额已用完，请换一个或调整限额"
+                )
         proj = R.ProjectRepo.get(conn, project_id)
         branch = None
         try:
@@ -93,6 +102,34 @@ class SessionService:
         except Exception:
             branch = None  # 非 git 仓库时跳过分支隔离
         return R.SessionRepo.create(conn, requirement_id, agent_id, project_id, branch)
+
+    @staticmethod
+    def set_agent(conn, session_id, agent_id):
+        """切换会话当前使用的 coding agent。
+
+        - agent 必须存在且当日限额可用；
+        - 不允许在有进行中的 run 时切换（避免半截流式输出绑到另一个 Agent）；
+        - 换 Agent 会清空 cli_session_id，后续消息按新 Agent 重新起聊。
+        """
+        sess = R.SessionRepo.get(conn, session_id)
+        if sess is None:
+            raise ValueError("会话不存在")
+        # 有进行中的 run 时禁止切换：_RUN_KEY 按 (session_id, message) 索引，
+        # 这里扫一遍当前会话是否仍有未 done 的 run。
+        for state in list(_RUNS.values()):
+            if state.session_id == session_id and not state.done:
+                raise RuntimeError("Agent 正在运行，请先等待完成或中止后再切换")
+        agent = R.AgentRepo.get(conn, agent_id)
+        if agent is None:
+            raise ValueError("Agent 不存在")
+        usage = R.AgentRepo.usage_map(conn)
+        if not R.AgentRepo.is_available(agent, usage.get(agent["id"], 0)):
+            raise RuntimeError(
+                f"Agent「{agent['name']}」今日 Token 限额已用完，请换一个或调整限额"
+            )
+        if sess.get("agent_id") == agent_id:
+            return sess
+        return R.SessionRepo.set_agent(conn, session_id, agent_id)
 
     @staticmethod
     def resolve_run(conn, session_id, message, actor=None):
