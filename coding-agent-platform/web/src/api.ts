@@ -1136,6 +1136,13 @@ export interface DirListing {
   limit: number
 }
 
+export interface FileSearchResult {
+  query: string
+  entries: FileEntry[]
+  truncated: boolean
+  limit: number
+}
+
 export interface FileContent {
   path: string
   size: number
@@ -1148,6 +1155,10 @@ export interface FileContent {
 /** 列出一个目录的直接子项；path 为空表示项目根目录。 */
 export const listFiles = (token: string | null, pid: number, path: string) =>
   req(buildUrl(`/api/projects/${pid}/files`, token, { path })) as Promise<DirListing>
+
+/** 全工作区文件名模糊检索（子串 + 子序列）。 */
+export const searchFiles = (token: string | null, pid: number, q: string, limit = 200) =>
+  req(buildUrl(`/api/projects/${pid}/files/search`, token, { q, limit })) as Promise<FileSearchResult>
 
 export const readFile = (token: string | null, pid: number, path: string) =>
   req(buildUrl(`/api/projects/${pid}/file`, token, { path })) as Promise<FileContent>

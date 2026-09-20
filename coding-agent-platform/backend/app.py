@@ -1949,6 +1949,19 @@ def list_project_files(pid: int, path: str = Query(""), allowed: set = Depends(g
     return _fs_guard(FS.list_dir, root, rel)
 
 
+@app.get("/api/projects/{pid}/files/search")
+def search_project_files(pid: int, q: str = Query("", min_length=0),
+                         limit: int = Query(FS.MAX_SEARCH_RESULTS, ge=1, le=FS.MAX_SEARCH_RESULTS),
+                         allowed: set = Depends(get_allowed),
+                         db: sqlite3.Connection = Depends(get_db)):
+    """按文件名模糊检索整个工作区（子串 + 子序列），供 Files 面板搜索框。"""
+    root = _project_root(db, pid, allowed)
+    query = (q or "").strip()
+    if not query:
+        return {"query": "", "entries": [], "truncated": False, "limit": limit}
+    return _fs_guard(FS.search_files, root, query, limit)
+
+
 @app.get("/api/projects/{pid}/file")
 def read_project_file(pid: int, path: str = Query(...), allowed: set = Depends(get_allowed),
                       db: sqlite3.Connection = Depends(get_db)):

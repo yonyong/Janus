@@ -103,6 +103,49 @@ def test_list_dir_missing_returns_404():
         assert e.code == 404
 
 
+# ---------------- 文件名模糊检索 ----------------
+
+def test_fuzzy_name_score_substring_and_subsequence():
+    assert FS.fuzzy_name_score("FilePane.tsx", "pane") is not None
+    assert FS.fuzzy_name_score("FilePane.tsx", "fptx") is not None
+    assert FS.fuzzy_name_score("readme.md", "rdm") is not None
+    assert FS.fuzzy_name_score("abc.txt", "xyz") is None
+    # 子串得分应高于纯子序列
+    sub = FS.fuzzy_name_score("echo.py", "echo") or 0
+    seq = FS.fuzzy_name_score("echo.py", "ecpy") or 0
+    assert sub > seq
+
+
+def test_search_files_recursive_fuzzy():
+    root = _root()
+    os.makedirs(os.path.join(root, "pkg", "inner"), exist_ok=True)
+    with open(os.path.join(root, "pkg", "inner", "UserService.ts"), "w", encoding="utf-8") as f:
+        f.write("export {}\n")
+    with open(os.path.join(root, "noise.txt"), "w", encoding="utf-8") as f:
+        f.write("x\n")
+    out = FS.search_files(root, "usrvc")
+    names = [e["name"] for e in out["entries"]]
+    assert "UserService.ts" in names
+    assert "noise.txt" not in names
+    # 目录名也可命中
+    out2 = FS.search_files(root, "inne")
+    assert any(e["name"] == "inner" for e in out2["entries"])
+
+
+def test_search_files_endpoint():
+    conn = _db()
+    root = _root()
+    pid = _project(conn, root)
+    allowed = {pid}
+    os.makedirs(os.path.join(root, "deep"), exist_ok=True)
+    with open(os.path.join(root, "deep", "config.yaml"), "w", encoding="utf-8") as f:
+        f.write("k: v\n")
+    empty = app_module.search_project_files(pid=pid, q="", allowed=allowed, db=conn, limit=50)
+    assert empty["entries"] == []
+    out = app_module.search_project_files(pid=pid, q="cfgy", allowed=allowed, db=conn, limit=50)
+    assert any(e["name"] == "config.yaml" for e in out["entries"])
+
+
 # ---------------- 读 / 写 ----------------
 
 def test_read_write_roundtrip():
