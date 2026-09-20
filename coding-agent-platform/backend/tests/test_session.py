@@ -285,3 +285,33 @@ def _last_invocation():
         return c.execute("SELECT * FROM agent_invocations ORDER BY id DESC LIMIT 1").fetchone()
     finally:
         c.close()
+
+
+def test_set_agent_switches_and_clears_cli_session():
+    """对话面板切换 Agent：更新 agent_id，并清空 CLI 续聊 id。"""
+    AgentRegistry.register("fake", FakeAgentAdapter())
+    conn = get_conn(); init_db(conn)
+    d = tempfile.mkdtemp()
+    a1 = R.AgentRepo.create(conn, "agent-a", "fake", {})
+    a2 = R.AgentRepo.create(conn, "agent-b", "fake", {})
+    p = R.ProjectRepo.create(conn, "d", d)
+    rq = R.RequirementRepo.create(conn, p["id"], "t", "")
+
+    s = S.SessionService.create(conn, rq["id"], agent_id=a1["id"])
+    R.SessionRepo.set_cli_session_id(conn, s["id"], "cli-old")
+    assert R.SessionRepo.get(conn, s["id"])["cli_session_id"] == "cli-old"
+
+    out = S.SessionService.set_agent(conn, s["id"], a2["id"])
+    assert out["agent_id"] == a2["id"]
+    assert out.get("cli_session_id") in (None, ""), "换 Agent 应清空续聊 id"
+
+    # 同 Agent 再设一次是幂等
+    out2 = S.SessionService.set_agent(conn, s["id"], a2["id"])
+    assert out2["agent_id"] == a2["id"]
+
+    try:
+        S.SessionService.set_agent(conn, s["id"], 999999)
+        assert False, "不存在的 agent 应报错"
+    except ValueError:
+        pass
+    conn.close()

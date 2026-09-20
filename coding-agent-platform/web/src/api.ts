@@ -1079,12 +1079,31 @@ export interface SessionDetail extends Session {
 export const sessionDetail = (token: string | null, sid: number) =>
   req(buildUrl(`/api/sessions/${sid}`, token)) as Promise<SessionDetail>
 
-export const createSession = (token: string | null, requirement_id: number) =>
+export const createSession = (
+  token: string | null,
+  requirement_id: number,
+  agent_id?: number,
+) =>
   req(buildUrl('/api/sessions', token), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ requirement_id }),
+    body: JSON.stringify({
+      requirement_id,
+      ...(agent_id != null ? { agent_id } : {}),
+    }),
   }) as Promise<Session>
+
+/** 切换会话当前使用的 coding agent（对话面板多 Agent 时可选）。 */
+export const setSessionAgent = (token: string | null, sid: number, agent_id: number) =>
+  req(buildUrl(`/api/sessions/${sid}/agent`, token), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agent_id }),
+  }) as Promise<{
+    id: number
+    agent_id: number
+    agent: { id: number; name: string; type: string } | null
+  }>
 
 export const sessionMessages = (token: string | null, sid: number) =>
   req(buildUrl(`/api/sessions/${sid}/messages`, token)) as Promise<Message[]>

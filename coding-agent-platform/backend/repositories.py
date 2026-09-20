@@ -508,6 +508,20 @@ class SessionRepo:
                              (requirement_id,)).fetchall()]
 
     @staticmethod
+    def set_agent(conn, sid, agent_id):
+        """切换会话绑定的 coding agent。
+
+        换 Agent 后旧的 CLI 外部会话无法续聊，一并清空 cli_session_id，
+        下一轮消息会以新 Agent 重新起一轮。
+        """
+        conn.execute(
+            "UPDATE sessions SET agent_id=?, cli_session_id=NULL WHERE id=?",
+            (agent_id, sid),
+        )
+        conn.commit()
+        return SessionRepo.get(conn, sid)
+
+    @staticmethod
     def set_cli_session_id(conn, sid, external_id):
         """记录底层 CLI 首轮返回的外部会话 id，后续轮次用 --resume 续聊。
 

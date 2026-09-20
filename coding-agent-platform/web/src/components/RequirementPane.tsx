@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState } from 'react'
-import { Avatar, Empty, Modal, Space, Spin, Typography } from 'antd'
+import { Avatar, Empty, Modal, Select, Space, Spin, Typography } from 'antd'
 import {
   ArrowRightOutlined,
   BulbOutlined,
@@ -13,7 +13,7 @@ import RichText from './RichText'
 import AgentMarkdown from './AgentMarkdown'
 import FilePreview, { previewKindOf, hasPreviewMode } from './FileViewer'
 import { parseMessage, extOf, type ChatAttachment } from '../chatAttachments'
-import { uploadSessionAttachments, readFile } from '../api'
+import { uploadSessionAttachments, readFile, type Agent } from '../api'
 
 /** 供父组件（如 Workbench）把快捷指令文本灌入输入框，不自动发送。 */
 export interface RequirementPaneHandle {
@@ -65,6 +65,14 @@ const RequirementPane = forwardRef<
     onAbort?: () => void
     /** 中止请求进行中（按钮转圈，防连点）。 */
     aborting?: boolean
+    /** 可选 Agent 列表：多于 1 个时在输入区上方展示选择器。 */
+    agents?: Agent[]
+    /** 当前会话绑定的 Agent id。 */
+    agentId?: number | null
+    /** 切换当前会话使用的 Agent。 */
+    onChangeAgent?: (agentId: number) => void
+    /** 切换 Agent 请求进行中。 */
+    agentSwitching?: boolean
   }
 >(function RequirementPane({
   messages,
@@ -80,6 +88,10 @@ const RequirementPane = forwardRef<
   onHintAction,
   onAbort,
   aborting = false,
+  agents = [],
+  agentId = null,
+  onChangeAgent,
+  agentSwitching = false,
 }, ref) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const chatRef = useRef<ChatPanelHandle>(null)
@@ -226,6 +238,28 @@ const RequirementPane = forwardRef<
               <ArrowRightOutlined />
             </button>
           )}
+        </div>
+      )}
+
+      {agents.length > 1 && onChangeAgent && (
+        <div className="chat-agent-bar">
+          <span className="chat-agent-bar-label">
+            <RobotOutlined /> 使用 Agent
+          </span>
+          <Select
+            size="small"
+            style={{ minWidth: 180, flex: 1, maxWidth: 320 }}
+            value={agentId ?? undefined}
+            disabled={busy || agentSwitching}
+            loading={agentSwitching}
+            placeholder="选择 Agent"
+            options={agents.map((a) => ({
+              value: a.id,
+              label: a.available === false ? `${a.name}（今日限额已满）` : a.name,
+              disabled: a.available === false && a.id !== agentId,
+            }))}
+            onChange={(v) => onChangeAgent(Number(v))}
+          />
         </div>
       )}
 

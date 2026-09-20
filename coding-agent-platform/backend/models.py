@@ -78,6 +78,11 @@ class MessageIn(BaseModel):
     message: str
 
 
+class SessionAgentIn(BaseModel):
+    """切换会话当前使用的 coding agent。"""
+    agent_id: int
+
+
 # ---------------- 工作台文件面板 ----------------
 
 class FileWriteIn(BaseModel):
