@@ -32,6 +32,7 @@ import {
   streamEvents,
 } from '../api'
 import type { RequirementPaneHandle } from '../components/RequirementPane'
+import ThemeSwitcher from '../components/ThemeSwitcher'
 import { buildFlowCommands, verifyCasesPrompt } from '../components/FlowCommands'
 import FileWorkArea, { STAGE_CAT } from '../components/FileWorkArea'
 import type { Cat } from '../components/FileWorkArea'
@@ -579,6 +580,7 @@ export default function Workbench() {
           >
             {busy ? 'Agent 运行中' : '空闲'}
           </Tag>
+          <ThemeSwitcher />
         </Space>
       </div>
 
