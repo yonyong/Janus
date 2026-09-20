@@ -193,7 +193,7 @@ const ChatPanel = forwardRef<
       )}
       {menuOpen && (
         <div className="slash-menu" role="listbox">
-          <div className="slash-menu-head">常用指令 · ↑↓ 选择 · Enter 填入 · Esc 关闭</div>
+          <div className="slash-menu-head">常用指令 · 数字键快速选 · ↑↓ · Enter · Esc</div>
           {slashFiltered.map((c, i) => (
             <button
               key={c.label}
@@ -204,6 +204,7 @@ const ChatPanel = forwardRef<
               onMouseEnter={() => setMenuIdx(i)}
               onClick={() => pickCommand(c)}
             >
+              <span className="slash-item-num">{i + 1}</span>
               <span className="slash-item-name">{c.label}</span>
               {c.desc && <span className="slash-item-desc">{c.desc}</span>}
             </button>
@@ -232,6 +233,14 @@ const ChatPanel = forwardRef<
                 return (cur - 1 + slashFiltered.length) % slashFiltered.length
               })
               return
+            }
+            if (/^[1-9]$/.test(e.key)) {
+              const idx = Number(e.key) - 1
+              if (idx < slashFiltered.length) {
+                e.preventDefault()
+                pickCommand(slashFiltered[idx])
+                return
+              }
             }
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()

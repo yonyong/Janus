@@ -42,7 +42,7 @@ import RequirementPane from '../components/RequirementPane'
  * 沉浸式工作台（2026-09 重设计版）：
  * - 顶部一条栏：返回 / 标题 / 会话·项目·Agent 元信息 / 当前阶段 chip / 运行状态。
  *   旧的工作流步骤条与标准/轻量模式切换已移除，阶段感知由右侧「流程指令」清单承载。
- * - 左栏固定文件区（FileWorkArea）：竖向分类（需求文档 / 用例 / 归档 / 项目文件）+
+ * - 左栏固定文件区（FileWorkArea）：竖向分类（需求 / Files / 脚本 / 用例 / 归档 / 帮助）+
  *   分类内横向子页签，按 .janus/{dir}/ 存储规范映射；分栏支持拖拽调宽与收起。
  * - 右栏：流程指令清单（跨阶段连续编号、已完成打标）+ Agent 对话。
  *   归档验收不再是独立页面，汇总与验收操作在「归档」分类里完成。
@@ -62,7 +62,7 @@ export default function Workbench() {
   const [cases, setCases] = useState<TestCase[]>([])
   const [casesLoading, setCasesLoading] = useState(false)
   const [stage, setStage] = useState<Stage>('clarify')
-  // 左栏分类（受控）：阶段变化时联动默认分类，快捷键 Alt+1~5 也能直接切换
+  // 左栏分类（受控）：阶段变化时联动默认分类，快捷键 Alt+1~6 也能直接切换
   const [cat, setCat] = useState<Cat>('req')
   const [conv, setConv] = useState<{ role: string; content: string }[]>([])
   // 流式输出：一次运行中 Agent 的全部输出（各轮流式正文 + 最终答复）都汇总进
@@ -500,10 +500,11 @@ export default function Workbench() {
     if (!e.altKey || e.ctrlKey || e.metaKey) return
     const actions: Record<string, () => void> = {
       '1': () => setCat('req'),
-      '2': () => setCat('cases'),
-      '3': () => setCat('arch'),
-      '4': () => setCat('code'),
-      '5': () => setCat('help'),
+      '2': () => setCat('code'),
+      '3': () => setCat('script'),
+      '4': () => setCat('cases'),
+      '5': () => setCat('arch'),
+      '6': () => setCat('help'),
       b: () => {
         setLeftCollapsed((v) => !v)
         setLeftPx(null)
