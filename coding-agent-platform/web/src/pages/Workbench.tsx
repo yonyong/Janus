@@ -654,6 +654,9 @@ export default function Workbench() {
             streamText={streamText}
             statusText={statusText}
             onSend={send}
+            sid={sessionId}
+            pid={pid}
+            token={token}
             quickCommands={composerCommands}
             stepHint={stepHint}
             onAbort={() => void abortRun()}

@@ -2455,6 +2455,99 @@ body.wb-dragging .wb-split::after {
   background: var(--bg-elevated);
 }
 
+/* 待发送附件 chip（输入框上方） */
+.composer-atts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.composer-att {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 3px 6px 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-soft);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+
+.composer-att-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-att-x {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: transparent;
+  color: var(--text-4);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.composer-att-x:hover {
+  color: var(--danger);
+  background: var(--bg-hover);
+}
+
+/* 历史消息里的文件 chip（点击预览） */
+.msg-atts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.msg-att {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text-1);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.msg-att:hover:not(:disabled) {
+  border-color: var(--tint-primary-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.msg-att:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* 用户气泡里的文件 chip 用半透明白描边，衬在蓝底上更清楚 */
+.bubble-me .msg-att {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
+}
+
+.bubble-me .msg-att:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.msg-att-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---------- 代码块 / diff ---------- */
 .code-block {
   display: block;

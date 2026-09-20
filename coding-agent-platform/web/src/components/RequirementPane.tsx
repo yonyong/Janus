@@ -1,9 +1,11 @@
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState } from 'react'
-import { Avatar, Empty, Space, Spin, Typography } from 'antd'
+import { Avatar, Empty, Modal, Space, Spin, Typography } from 'antd'
 import {
   ArrowRightOutlined,
   BulbOutlined,
   DownOutlined,
+  FileImageOutlined,
+  FileOutlined,
   RobotOutlined,
   ThunderboltOutlined,
   UserOutlined,
@@ -11,6 +13,9 @@ import {
 import ChatPanel, { type ChatPanelHandle } from './ChatPanel'
 import RichText from './RichText'
 import AgentMarkdown from './AgentMarkdown'
+import FilePreview, { previewKindOf } from './FileViewer'
+import { parseMessage, extOf, type ChatAttachment } from '../chatAttachments'
+import { uploadSessionAttachments, readFile } from '../api'
 
 /** 供父组件（如 Workbench）把快捷指令文本灌入输入框，不自动发送。 */
 export interface RequirementPaneHandle {
@@ -48,6 +53,10 @@ const RequirementPane = forwardRef<
     /** 瞬态状态提示（如「调用工具 …」），没有正文在流式时显示。 */
     statusText?: string
     onSend: (text: string) => void
+    /** 会话/项目上下文：粘贴文件上传 + 历史消息文件预览用。 */
+    sid?: number
+    pid?: number | null
+    token?: string | null
     /** 非空时在输入框上方渲染常用指令按钮（编码实现阶段使用）。 */
     quickCommands?: QuickCommand[]
     /** 上一步完成后的下一步引导（如「润色完成 → 生成详细设计」）。 */
@@ -67,6 +76,9 @@ const RequirementPane = forwardRef<
   streamText = '',
   statusText = '',
   onSend,
+  sid,
+  pid,
+  token,
   quickCommands,
   stepHint,
   onHintAction,
@@ -78,6 +90,54 @@ const RequirementPane = forwardRef<
   const chatRef = useRef<ChatPanelHandle>(null)
   // 常用指令条默认展开，用户可收起（避免长指令占用输入区上方空间）
   const [qcOpen, setQcOpen] = useState(true)
+  // 历史消息文件预览：点击附件 chip 打开
+  const [preview, setPreview] = useState<{ path: string; ext: string; content: string; name: string } | null>(null)
+
+  const uploadFiles = sid
+    ? async (files: File[]): Promise<ChatAttachment[]> => {
+        const rows = await uploadSessionAttachments(token ?? null, sid, files)
+        return rows.map((r) => ({ path: r.path, filename: r.filename, size: r.size }))
+      }
+    : undefined
+
+  const openPreview = async (a: ChatAttachment) => {
+    if (pid == null) return
+    const ext = extOf(a.filename)
+    const kind = previewKindOf(ext)
+    const binaryPreview =
+      kind === 'pdf' || kind === 'image' || kind === 'sheet' || kind === 'docx' || kind === 'office-legacy'
+    let content = ''
+    if (!binaryPreview) {
+      try {
+        content = (await readFile(token ?? null, pid, a.path)).content
+      } catch {
+        /* 读不到内容时仍打开预览（二进制预览器自行拉取，文本类给下载兜底） */
+      }
+    }
+    setPreview({ path: a.path, ext, content, name: a.filename })
+  }
+
+  /** 文件 chip 列表（历史消息 / 预览入口）。 */
+  const FileChips = ({ files }: { files: ChatAttachment[] }) => (
+    <div className="msg-atts">
+      {files.map((a) => {
+        const isImg = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(extOf(a.filename))
+        return (
+          <button
+            key={a.path}
+            type="button"
+            className="msg-att"
+            title={pid == null ? a.path : `点击预览 · ${a.path}`}
+            disabled={pid == null}
+            onClick={() => void openPreview(a)}
+          >
+            {isImg ? <FileImageOutlined /> : <FileOutlined />}
+            <span className="msg-att-name">{a.filename}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
 
   useImperativeHandle(ref, () => ({
     loadDraft: (text: string) => {
@@ -115,7 +175,19 @@ const RequirementPane = forwardRef<
                   }
                 />
                 <div className={`bubble ${isUser ? 'bubble-me' : 'bubble-agent'}`}>
-                  {isUser ? <RichText text={m.content} /> : <AgentMarkdown text={m.content} />}
+                  {isUser ? (
+                    (() => {
+                      const { text, files } = parseMessage(m.content)
+                      return (
+                        <>
+                          {text && <RichText text={text} />}
+                          {files.length > 0 && <FileChips files={files} />}
+                        </>
+                      )
+                    })()
+                  ) : (
+                    <AgentMarkdown text={m.content} />
+                  )}
                 </div>
               </div>
             )
@@ -194,7 +266,29 @@ const RequirementPane = forwardRef<
         </div>
       )}
 
-      <ChatPanel ref={chatRef} busy={busy} onSend={onSend} onAbort={onAbort} aborting={aborting} />
+      <ChatPanel
+        ref={chatRef}
+        busy={busy}
+        onSend={onSend}
+        onUpload={uploadFiles}
+        onAbort={onAbort}
+        aborting={aborting}
+      />
+
+      <Modal
+        title={preview?.name}
+        open={!!preview}
+        onCancel={() => setPreview(null)}
+        footer={<a onClick={() => setPreview(null)}>关闭</a>}
+        width={860}
+        destroyOnHidden
+      >
+        {preview && pid != null && (
+          <div className="fv-stage">
+            <FilePreview pid={pid} token={token ?? null} path={preview.path} ext={preview.ext} content={preview.content} />
+          </div>
+        )}
+      </Modal>
     </div>
   )
 })

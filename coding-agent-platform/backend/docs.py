@@ -97,6 +97,11 @@ def usecase_attach_subdir(dir_name: str) -> str:
     return f"{dir_name}/usecase/attach"
 
 
+def chat_attach_subdir(dir_name: str) -> str:
+    """对话里粘贴/上传的文件落盘子目录：.janus/{dir}/chat/attach/。"""
+    return f"{dir_name}/chat/attach"
+
+
 # 一需求一份「总验收脚本」入口：日常验收只跑脚本（AI 不再临场想测法）。
 # 语言不限，约定入口文件名 accept.*；默认 accept.py，按扩展名选解释器（见 acceptance.py）。
 ACCEPT_CANDIDATES = ("accept.py", "accept.sh", "accept.mjs", "accept.js")

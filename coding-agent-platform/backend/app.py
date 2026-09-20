@@ -1526,6 +1526,45 @@ def session_history(sid: int, db: sqlite3.Connection = Depends(get_db), token: s
     return R.MessageRepo.list_by_session(db, sid)
 
 
+@app.post("/api/sessions/{sid}/attachments")
+def upload_session_attachments(sid: int, files: list[UploadFile] = File(...),
+                               db: sqlite3.Connection = Depends(get_db),
+                               token: str = Query(None), admin: str = Query(None)):
+    """对话输入框粘贴/选择的文件：存到 .janus/{需求目录}/chat/attach/，返回项目内相对路径。
+
+    不落 DB：路径随消息文本一并发出（消息里带 [[janus:files]] 引用），既能被 Agent
+    直接读取，也能在历史消息里点开预览。鉴权与其他会话接口一致（令牌/管理员）。
+    """
+    allowed = resolve_access(db, token, admin)
+    if allowed is None:
+        raise HTTPException(status_code=401, detail="无效或缺失访问令牌")
+    sess = R.SessionRepo.get(db, sid)
+    if sess is None:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    if sess["project_id"] not in allowed:
+        raise HTTPException(status_code=403, detail="无权访问该项目")
+    proj = _require_project(db, sess["project_id"])
+    req = R.RequirementRepo.get(db, sess["requirement_id"])
+    d = (req or {}).get("dir_name") or WD.sanitize_dir_name((req or {}).get("title") or "")
+    out: list[dict] = []
+    for f in files:
+        if f is None:
+            continue
+        filename = f.filename or "attachment"
+        data = f.file.read()
+        try:
+            rel = WD.save_attachment(proj["disk_path"], WD.chat_attach_subdir(d), filename, data)
+        except FS.FsError as e:
+            raise HTTPException(status_code=getattr(e, "code", 400) or 400, detail=str(e))
+        out.append({"path": rel, "filename": filename, "size": len(data)})
+    if out:
+        audit.log("session.attach", target_type="session", target_id=sid,
+                  target_name=(req or {}).get("title") or "", project_id=sess["project_id"],
+                  project_name=(proj or {}).get("name") or "",
+                  detail={"count": len(out), "names": [r["filename"] for r in out][:10]})
+    return out
+
+
 @app.get("/api/sessions/{sid}/events")
 async def stream_events(
     sid: int,

@@ -835,6 +835,22 @@ export async function uploadCaseAttachments(
 export const listAttachments = (token: string | null, rid: number) =>
   req(buildUrl(`/api/requirements/${rid}/attachments`, token)) as Promise<Attachment[]>
 
+/** 对话输入框粘贴/选择的文件：存 .janus/{dir}/chat/attach/，返回项目内相对路径。
+ *  路径随消息文本一并发出，Agent 可直接读取，历史消息里也能点开预览。 */
+export async function uploadSessionAttachments(
+  token: string | null,
+  sid: number,
+  files: File[],
+): Promise<{ path: string; filename: string; size: number }[]> {
+  const fd = new FormData()
+  for (const f of files) fd.append('files', f)
+  return req(buildUrl(`/api/sessions/${sid}/attachments`, token), {
+    method: 'POST',
+    body: fd,
+    timeoutMs: 120000,
+  }) as Promise<{ path: string; filename: string; size: number }[]>
+}
+
 export const deleteAttachment = (token: string | null, aid: number) =>
   req(buildUrl(`/api/attachments/${aid}`, token), { method: 'DELETE' }) as Promise<any>
 
