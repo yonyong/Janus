@@ -13,7 +13,7 @@ import {
 import ChatPanel, { type ChatPanelHandle } from './ChatPanel'
 import RichText from './RichText'
 import AgentMarkdown from './AgentMarkdown'
-import FilePreview, { previewKindOf } from './FileViewer'
+import FilePreview, { previewKindOf, hasPreviewMode } from './FileViewer'
 import { parseMessage, extOf, type ChatAttachment } from '../chatAttachments'
 import { uploadSessionAttachments, readFile } from '../api'
 
@@ -285,7 +285,14 @@ const RequirementPane = forwardRef<
       >
         {preview && pid != null && (
           <div className="fv-stage">
-            <FilePreview pid={pid} token={token ?? null} path={preview.path} ext={preview.ext} content={preview.content} />
+            {hasPreviewMode(preview.ext) ? (
+              <FilePreview pid={pid} token={token ?? null} path={preview.path} ext={preview.ext} content={preview.content} />
+            ) : (
+              // 纯文本 / 未知类型没有专门预览器：直接把内容铺在等宽块里
+              <pre className="code-block" style={{ maxHeight: '58vh' }}>
+                {preview.content || '（空文件或内容不可预览）'}
+              </pre>
+            )}
           </div>
         )}
       </Modal>
