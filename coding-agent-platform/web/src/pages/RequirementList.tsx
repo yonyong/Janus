@@ -246,10 +246,11 @@ export default function RequirementList() {
             const createdAt = fmtTime(r.created_at, t.prefix)
             const updatedAt = fmtTime(r.updated_at, t.prefix)
             return (
-              <Col xs={24} md={12} xl={8} key={r.id}>
+              <Col xs={24} md={12} xl={8} key={r.id} style={{ display: 'flex' }}>
                 <Card
-                  className="app-tile"
+                  className="app-tile req-tile"
                   styles={{ body: { padding: 18 } }}
+                  style={{ width: '100%' }}
                   title={
                     <div style={{ minWidth: 0 }}>
                       <Space size={6} style={{ maxWidth: '100%' }}>
@@ -287,20 +288,8 @@ export default function RequirementList() {
                     </Button>,
                   ]}
                 >
-                  {/* 描述固定最多 4 行，超出截断：卡片高度不随长需求无限扩张 */}
-                  <div
-                    style={{
-                      color: '#646a73',
-                      fontSize: 13,
-                      minHeight: 44,
-                      maxHeight: 88,
-                      overflow: 'hidden',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 4,
-                      WebkitBoxOrient: 'vertical',
-                      whiteSpace: 'pre-wrap',
-                    }}
-                  >
+                  {/* 描述固定 4 行高度：同行卡片等高，底部操作对齐 */}
+                  <div className="req-tile-desc">
                     <Tooltip title={r.description ? <span style={{ whiteSpace: 'pre-wrap' }}>{r.description}</span> : ''}>
                       <span>{r.description || ''}</span>
                     </Tooltip>
@@ -308,12 +297,13 @@ export default function RequirementList() {
                   </div>
                   {/* 状态 + 时间元信息行 */}
                   <div
+                    className="req-tile-meta"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: 8,
-                      marginTop: 12,
-                      paddingTop: 10,
+                      marginTop: 'auto',
+                      paddingTop: 12,
                       borderTop: '1px solid #f0f1f2',
                       flexWrap: 'wrap',
                     }}
