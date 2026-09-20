@@ -261,6 +261,67 @@ def test_build_cli_omits_model_when_unset_or_invalid():
         cb.shutil.which = orig
 
 
+def test_build_cli_adds_resume_flag_per_spec():
+    """resume_id 非空时按规格注入续聊：flag 型 --resume <id>；codex 走 exec resume <id>。"""
+    orig = cb.shutil.which
+    try:
+        cb.shutil.which = lambda c: None
+        # flag 型：codebuddy / claude / cursor
+        for t in ("codebuddy", "claude", "cursor"):
+            cli = cb._build_cli({}, "hi", cb._CLI_SPECS[t], resume_id="sess-abc")
+            assert "--resume" in cli
+            assert cli[cli.index("--resume") + 1] == "sess-abc"
+            assert cli[-1] == "hi"
+        # codex：子命令型，exec 之后插入 resume <id>
+        cli = cb._build_cli({}, "hi", cb._CLI_SPECS["codex"], resume_id="sess-xyz")
+        i = cli.index("exec")
+        assert cli[i + 1:i + 3] == ["resume", "sess-xyz"]
+        assert "--resume" not in cli
+        # resume_id 空白 / None：不注入任何续聊参数
+        for rid in (None, "", "   "):
+            cli = cb._build_cli({}, "hi", cb._CLI_SPECS["codebuddy"], resume_id=rid)
+            assert "--resume" not in cli
+        cli = cb._build_cli({}, "hi", cb._CLI_SPECS["codex"], resume_id=None)
+        assert "resume" not in cli
+    finally:
+        cb.shutil.which = orig
+
+
+def test_stream_session_captures_external_session_id():
+    """stream-json 的 system/init（及后续事件）携带的 session_id 被捕获，首个非空生效。"""
+    s = cb._StreamSession()
+    s.handle_line(json.dumps({"type": "system", "subtype": "init",
+                              "session_id": "ext-1"}).encode())
+    assert s.session_id == "ext-1"
+    # 后续事件即使再带别的 id 也不覆盖首个（同一会话 id 固定）
+    s.handle_line(json.dumps({"type": "result", "is_error": False, "result": "ok",
+                              "session_id": "ext-2"}).encode())
+    assert s.session_id == "ext-1"
+    # 空白 / 缺失的 session_id 不产生捕获
+    s2 = cb._StreamSession()
+    s2.handle_line(json.dumps({"type": "system", "session_id": "  "}).encode())
+    assert s2.session_id is None
+
+
+def test_parse_result_json_extracts_session_id():
+    """JSON 结果模式：单对象与事件数组两种形态都能取出 session_id。"""
+    parsed = cb.parse_result_json(json.dumps({
+        "type": "result", "is_error": False, "result": "done",
+        "session_id": "obj-sid", "usage": {"input_tokens": 5, "output_tokens": 3}}))
+    assert parsed["session_id"] == "obj-sid"
+    # 数组：session_id 落在没有 usage 的 init 事件上，也要能补齐到结果里
+    events = [
+        {"type": "system", "subtype": "init", "session_id": "arr-sid"},
+        {"type": "message", "role": "assistant", "content": [{"type": "text", "text": "hi"}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+    ]
+    parsed = cb.parse_result_json(json.dumps(events))
+    assert parsed["session_id"] == "arr-sid"
+    # 没有 session_id 时为 None，不报错
+    parsed = cb.parse_result_json(json.dumps({"is_error": False, "result": "x", "usage": {}}))
+    assert parsed["session_id"] is None
+
+
 def test_build_cli_specs_for_all_cli_types():
     """claude / codex / cursor 复用同一套通用 CLI 流程，各自有正确的基础参数与模型参数。"""
     orig = cb.shutil.which

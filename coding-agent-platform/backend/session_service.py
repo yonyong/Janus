@@ -321,7 +321,21 @@ async def _run_agent(run_id, session_id, message):
                 # （真实案例：把详细设计写进遗留的 .janus/docs/requirement.md）。
                 # 每轮消息前拼上路径约定，聊天 Agent 与快捷指令共享同一套规范。
                 prompt = WD.agent_context_brief((req or {}).get("dir_name") or "") + message
-                async for ev in provider.invoke(agent, prompt, proj["disk_path"]):
+                # 续聊：本会话若已记过底层 CLI 外部会话 id，用它 --resume（不拼 prompt 历史）
+                resume_id = sess.get("cli_session_id") or None
+                async for ev in provider.invoke(agent, prompt, proj["disk_path"],
+                                                resume_id=resume_id):
+                    # session 事件：底层 CLI 首轮返回的外部会话 id，落库供后续轮次续聊。
+                    # 不落对话、不推前端、不进审计（纯内部状态）。
+                    if ev.type == "session":
+                        ext = (ev.payload or {}).get("cli_session_id")
+                        if ext:
+                            try:
+                                R.SessionRepo.set_cli_session_id(conn, session_id, ext)
+                            except Exception as e:  # noqa: BLE001 - 落库失败不该中断运行
+                                LOG.emit(pid, f"记录 CLI 会话 id 失败：{e}", level="warn",
+                                         source="session", meta={"session_id": session_id})
+                        continue
                     payload = json.loads(ev.to_json())
                     if ev.type == "edit" and proj is not None:
                         payload["diff"] = D.compute(proj["disk_path"])

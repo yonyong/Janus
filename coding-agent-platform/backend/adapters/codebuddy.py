@@ -312,6 +312,7 @@ _CLI_SPECS = {
     "codebuddy": {"cmd": "codebuddy", "base_flags": ("-p", "-y"),
                   "model_flag": "--model", "trust": True, "json_result": True,
                   "api_key_env": "CODEBUDDY_API_KEY",
+                  "resume": {"mode": "flag", "flag": "--resume"},
                   "stream_flags": ("--output-format", "stream-json",
                                    "--include-partial-messages", "--verbose")},
     # claude：-p 非交互打印模式；--dangerously-skip-permissions 对应 -y 的跳权限语义；
@@ -319,11 +320,14 @@ _CLI_SPECS = {
     "claude": {"cmd": "claude", "base_flags": ("-p", "--dangerously-skip-permissions"),
                "model_flag": "--model", "trust": False,
                "api_key_env": "ANTHROPIC_API_KEY",
+               "resume": {"mode": "flag", "flag": "--resume"},
                "stream_flags": ("--output-format", "stream-json",
                                 "--include-partial-messages", "--verbose")},
     # codex：exec 非交互模式；--full-auto 沙箱内自动执行；非 git 目录需 --skip-git-repo-check
+    # 续聊走子命令：codex exec resume <SESSION_ID> ...（不是 --resume 参数）
     "codex": {"cmd": "codex", "base_flags": ("exec", "--full-auto", "--skip-git-repo-check"),
               "model_flag": "--model", "trust": False, "stream_flags": (),
+              "resume": {"mode": "subcommand", "after": "exec", "token": "resume"},
               "api_key_env": "OPENAI_API_KEY"},
     # cursor：cursor-agent 的非交互打印模式；--trust 跳过 Workspace Trust 交互确认
     # （平台在临时目录里跑 agent，没人能在终端里答 trust 询问，不加会直接失败）；
@@ -331,6 +335,7 @@ _CLI_SPECS = {
     # 真实 usage（camelCase 键名，normalize_usage 已兼容），用量留痕不再靠估算
     "cursor": {"cmd": "cursor-agent", "base_flags": ("-p", "--trust"),
                "model_flag": "--model", "trust": False, "stream_flags": (),
+               "resume": {"mode": "flag", "flag": "--resume"},
                "json_result": True, "api_key_env": "CURSOR_API_KEY"},
 }
 
@@ -360,16 +365,36 @@ def _wants_stream(cfg: dict, spec: dict) -> bool:
     return not any(str(a).startswith("--output-format") for a in args)
 
 
+def _resume_token(resume_id) -> str:
+    """把外部会话 id 归一成可安全放进命令行的字符串；无效值返回空串。"""
+    return resume_id.strip() if isinstance(resume_id, str) and resume_id.strip() else ""
+
+
 def _build_cli(cfg: dict, message: str, spec: dict | None = None,
-               include_message: bool = True) -> list:
-    """按 agent 配置拼出命令行：[入口, base_flags..., (--output-format ...), (--model <model>), args..., message]。
+               include_message: bool = True, resume_id: str | None = None) -> list:
+    """按 agent 配置拼出命令行：[入口, base_flags..., (resume), (--output-format ...), (--model <model>), args..., message]。
 
     ``cfg.model``（可在「Agent 管理」里配置）非空字符串时追加模型参数，
     留空则用 CLI 自身默认模型；非字符串值（如误填数字）一律忽略。
     ``include_message=False`` 时不把消息追加为参数（配合 stdin 传消息，见 invoke）。
+    ``resume_id`` 非空且规格支持续聊时，按 flag（``--resume <id>``）或子命令
+    （``exec resume <id>``）注入，让底层 CLI 在同一会话上下文里续聊。
     """
     spec = spec or _CLI_SPECS["codebuddy"]
     cli = [_resolve_cmd(cfg.get("cmd") or spec["cmd"]), *spec["base_flags"]]
+    rid = _resume_token(resume_id)
+    resume_spec = spec.get("resume") if rid else None
+    if resume_spec and resume_spec.get("mode") == "subcommand":
+        # codex：base_flags 里的子命令（exec）之后插入 `resume <id>`
+        after = resume_spec.get("after")
+        tok = resume_spec.get("token", "resume")
+        if after in cli:
+            i = cli.index(after) + 1
+            cli[i:i] = [tok, rid]
+        else:
+            cli += [tok, rid]
+    elif resume_spec and resume_spec.get("mode") == "flag":
+        cli += [resume_spec.get("flag", "--resume"), rid]
     if _wants_stream(cfg, spec):
         cli += list(spec["stream_flags"])
     elif _wants_json_output(cfg, spec):
@@ -449,32 +474,45 @@ def _text_blocks(content) -> str:
     return "\n".join(p for p in parts if p)
 
 
+def _session_id_of(d) -> str | None:
+    sid = d.get("session_id") if isinstance(d, dict) else None
+    return sid.strip() if isinstance(sid, str) and sid.strip() else None
+
+
 def _from_obj(d) -> dict | None:
-    """单个结果对象 → {text, usage, is_error}；不是结果形态返回 None。"""
+    """单个结果对象 → {text, usage, is_error, session_id}；不是结果形态返回 None。"""
     if not isinstance(d, dict):
         return None
     if "result" in d or "is_error" in d:
         body = d.get("result")
         return {"text": body if isinstance(body, str) else (_text_blocks(d.get("content"))),
                 "usage": normalize_usage(d.get("usage")),
-                "is_error": bool(d.get("is_error"))}
+                "is_error": bool(d.get("is_error")),
+                "session_id": _session_id_of(d)}
     # 事件数组里的消息形态：带 usage 的消息也是有效结果（数组分支会优先按 usage 找）
     if "usage" in d and isinstance(d.get("usage"), dict):
         return {"text": _text_blocks(d.get("content")),
                 "usage": normalize_usage(d.get("usage")),
-                "is_error": bool(d.get("is_error"))}
+                "is_error": bool(d.get("is_error")),
+                "session_id": _session_id_of(d)}
     return None
 
 
 def _from_array(items) -> dict | None:
-    """事件数组 → 取最后一条带 usage 的消息作为结果；一条都没有返回 None。"""
+    """事件数组 → 取最后一条带 usage 的消息作为结果；一条都没有返回 None。
+
+    session_id 可能落在没有 usage 的 system/init 或 result 事件上，因此单独扫一遍
+    整个数组补齐（结果消息本身没带时用它兜底）。
+    """
     if not isinstance(items, list):
         return None
     is_error = any(isinstance(x, dict) and x.get("is_error") for x in items)
+    array_sid = next((s for d in items if (s := _session_id_of(d))), None)
     for d in reversed(items):
         got = _from_obj(d)
         if got is not None and got["usage"] is not None:
             got["is_error"] = got["is_error"] or is_error
+            got["session_id"] = got.get("session_id") or array_sid
             return got
     return None
 
@@ -539,6 +577,7 @@ class _StreamSession:
         self.final_usage: dict | None = None
         self.result_is_error: bool = False
         self.error_text: str | None = None
+        self.session_id: str | None = None   # CLI 外部会话 id（system/init 或 result 携带）
 
     # -- 单行解析 --
 
@@ -561,6 +600,10 @@ class _StreamSession:
     def _handle(self, data: dict) -> list[AgentEvent]:
         evs: list[AgentEvent] = []
         t = data.get("type")
+        # 任何事件携带的 session_id 都记下来（system/init 最早给出，result 兜底）
+        sid = data.get("session_id")
+        if isinstance(sid, str) and sid.strip() and not self.session_id:
+            self.session_id = sid.strip()
         if t == "stream_event":
             inner = data.get("event") or {}
             if inner.get("type") == "content_block_delta":
@@ -657,7 +700,7 @@ class CliAgentAdapter:
                 except Exception:  # noqa: BLE001 - 收尾失败不影响主流程
                     err_task.cancel()
 
-    async def invoke(self, agent_row, message, project_path):
+    async def invoke(self, agent_row, message, project_path, resume_id=None):
         cfg = json.loads(agent_row["config"]) if isinstance(agent_row, dict) else {}
         cmd = cfg.get("cmd") or self.spec["cmd"]
         # Windows 上 CLI 经 cmd.exe 启动 .cmd 垫片，多行命令行参数会在第一个换行处
@@ -665,8 +708,9 @@ class CliAgentAdapter:
         # 因此含换行的消息一律改走 stdin 传给 CLI（CLI 非交互模式支持从 stdin 读提示词），
         # 单行消息仍走命令行参数，行为不变。
         multiline = "\n" in message
-        # 基础参数 + 可选模型参数 + 自定义 args；信任目录仅 codebuddy 需要临时注入（见下方 finally）
-        cli = _build_cli(cfg, message, self.spec, include_message=not multiline)
+        # 基础参数 + 可选续聊参数 + 可选模型参数 + 自定义 args；信任目录仅 codebuddy 需要临时注入（见下方 finally）
+        cli = _build_cli(cfg, message, self.spec, include_message=not multiline,
+                         resume_id=resume_id)
         # 流式模式：stdout 是逐行 JSON 事件流，边跑边产出事件（对话实时展示的来源）
         stream_mode = _wants_stream(cfg, self.spec)
         # JSON 结果模式：stdout 是单个结果 JSON（内含真实 usage），不逐行进实时日志
@@ -746,6 +790,10 @@ class CliAgentAdapter:
         stderr = _decode(err).strip()
 
         if stream_mode and state is not None:
+            # 捕获到底层 CLI 外部会话 id：产出 session 事件，由 session_service 落库供续聊
+            if state.session_id:
+                yield AgentEvent(type="session", pane="message",
+                                 payload={"cli_session_id": state.session_id})
             # stderr 噪声过滤后作为 info 事件透出（与文本模式一致），不阻断主流程
             info_lines = [ln for ln in stderr.splitlines() if not is_noise_line(ln)]
             info_text = "\n".join(info_lines).strip()
@@ -780,6 +828,9 @@ class CliAgentAdapter:
         if json_mode and stdout:
             parsed = parse_result_json(stdout)
             if parsed is not None:
+                if parsed.get("session_id"):
+                    yield AgentEvent(type="session", pane="message",
+                                     payload={"cli_session_id": parsed["session_id"]})
                 if info_text:
                     yield AgentEvent(type="info", pane="message", text=info_text,
                                      payload={"streamed": True})

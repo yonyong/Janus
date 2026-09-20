@@ -55,7 +55,7 @@ class _SlowAdapter:
 
     type = "slow-abortable"
 
-    async def invoke(self, agent_row, message, project_path):
+    async def invoke(self, agent_row, message, project_path, resume_id=None):
         from backend.agent_runtime import AgentEvent
         yield AgentEvent(type="delta", pane="message", text="开始")
         for _ in range(600):
@@ -178,12 +178,62 @@ def test_diff_summary_degrades_gracefully():
     assert S._diff_summary("") == "工作区已改动"
 
 
+class _ResumeSpyAdapter:
+    """记录每轮收到的 resume_id，并在首轮产出一个外部会话 id。"""
+
+    type = "resume-spy"
+
+    def __init__(self):
+        self.seen_resume: list = []
+
+    async def invoke(self, agent_row, message, project_path, resume_id=None):
+        from backend.agent_runtime import AgentEvent
+        self.seen_resume.append(resume_id)
+        if not resume_id:
+            yield AgentEvent(type="session", pane="message",
+                             payload={"cli_session_id": "cli-xyz"})
+        yield AgentEvent(type="message", pane="message", text=f"收到：{message}")
+
+
+def test_cli_session_id_persisted_and_resumed():
+    """item 12：首轮捕获底层 CLI 会话 id 落库，后续轮次以该 id 作 resume 续聊。"""
+    import tempfile as _tf
+    spy = _ResumeSpyAdapter()
+    AgentRegistry.register("resume-spy", spy)
+    conn = get_conn(); init_db(conn)
+    d = _tf.mkdtemp()
+    ag = R.AgentRepo.create(conn, "spy", "resume-spy", {})
+    p = R.ProjectRepo.create(conn, "d", d)
+    rq = R.RequirementRepo.create(conn, p["id"], "t", "")
+
+    async def run():
+        s = S.SessionService.create(conn, rq["id"], agent_id=ag["id"])
+        # 首轮：resume_id 应为 None，运行后 cli_session_id 落库
+        _, rid = S.SessionService.resolve_run(conn, s["id"], "第一句")
+        [e async for e in S.SessionService.stream_run(rid)]
+        sess = R.SessionRepo.get(conn, s["id"])
+        assert sess["cli_session_id"] == "cli-xyz", "首轮应把外部会话 id 落库"
+        assert spy.seen_resume[0] is None, "首轮不带 resume_id"
+
+        # 次轮：应带上已落库的 cli_session_id 作 resume
+        _, rid2 = S.SessionService.resolve_run(conn, s["id"], "第二句")
+        [e async for e in S.SessionService.stream_run(rid2)]
+        assert spy.seen_resume[1] == "cli-xyz", "次轮应以首轮外部会话 id 续聊"
+        # session 事件不落对话，只留 message
+        agent_msgs = [m for m in R.MessageRepo.list_by_session(conn, s["id"])
+                      if m["role"] == "agent"]
+        assert all(m["content"] for m in agent_msgs), "session 事件不应落成空对话消息"
+
+    asyncio.run(run())
+    conn.close()
+
+
 class _ErrorOnlyAdapter:
     """只吐一个 error 事件的适配器：模拟 codebuddy「CLI 没有任何输出」这类失败。"""
 
     type = "err-only"
 
-    async def invoke(self, agent_row, message, project_path):
+    async def invoke(self, agent_row, message, project_path, resume_id=None):
         from backend.agent_runtime import AgentEvent
         yield AgentEvent(type="error", pane="message", text="模型不可用")
 

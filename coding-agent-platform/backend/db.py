@@ -56,6 +56,8 @@ CREATE TABLE IF NOT EXISTS sessions(
   agent_id INTEGER NOT NULL,
   project_id INTEGER NOT NULL,
   git_branch TEXT,
+  -- 底层 CLI 首轮返回的外部会话 id：后续轮次用 --resume 续聊（见 adapters/codebuddy.py）
+  cli_session_id TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY(requirement_id) REFERENCES requirements(id),
   FOREIGN KEY(agent_id) REFERENCES agents(id),
@@ -232,6 +234,8 @@ _MIGRATIONS = [
     # 需求创建/最近更新时间（需求列表卡片展示；本地时间）
     ("requirements", "created_at", "TEXT"),
     ("requirements", "updated_at", "TEXT"),
+    # 底层 CLI 外部会话 id（--resume 续聊用）
+    ("sessions", "cli_session_id", "TEXT"),
 ]
 
 

@@ -492,6 +492,20 @@ class SessionRepo:
                 conn.execute("SELECT * FROM sessions WHERE requirement_id=? ORDER BY id",
                              (requirement_id,)).fetchall()]
 
+    @staticmethod
+    def set_cli_session_id(conn, sid, external_id):
+        """记录底层 CLI 首轮返回的外部会话 id，后续轮次用 --resume 续聊。
+
+        只在从无到有（或值发生变化）时写一次，避免每轮无谓写库。空值不覆盖已有值。
+        """
+        if not external_id:
+            return
+        row = conn.execute("SELECT cli_session_id FROM sessions WHERE id=?", (sid,)).fetchone()
+        if row is None or (row[0] or "") == external_id:
+            return
+        conn.execute("UPDATE sessions SET cli_session_id=? WHERE id=?", (external_id, sid))
+        conn.commit()
+
 
 class MessageRepo:
     @staticmethod
