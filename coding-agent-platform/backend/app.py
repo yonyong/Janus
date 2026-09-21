@@ -25,6 +25,7 @@ from . import snapshots as SN
 from . import test_report as TR
 from . import acceptance as ACC
 from . import scripts as SCR
+from .config import public_share_base
 from .models import (AgentCreate, AgentUpdate, AgentReorderIn, AgentTestIn, ProjectCreate,
                      ProjectUpdate,
                      RequirementCreate,
@@ -482,7 +483,7 @@ def update_project(pid: int, body: ProjectUpdate, db: sqlite3.Connection = Depen
 
 @app.post("/api/projects/{pid}/issue-token")
 def issue_token(pid: int, body: TokenIssue | None = None,
-                db: sqlite3.Connection = Depends(get_db), request: Request = None,
+                db: sqlite3.Connection = Depends(get_db),
                 _ok=Depends(require_admin)):
     ids = body.project_ids if body and body.project_ids else [pid]
     try:
@@ -492,8 +493,7 @@ def issue_token(pid: int, body: TokenIssue | None = None,
         _token_expiry_error(e)
     tok = auth.TokenService.issue(db, ids, expires_at=expires_at,
                                   note=(body.note if body else ""))
-    base = str(request.base_url).rstrip("/") if request else "http://localhost:8000"
-    link = f"{base}/?token={tok}"
+    link = f"{public_share_base()}/?token={tok}"
     # 令牌原文绝不入日志：审计要能追责，但不能变成第二个泄露口
     audit.log("token.issue", target_type="token", target_name=audit.mask_token(tok),
               project_id=pid, detail={"project_ids": ids, "expires_at": expires_at,
@@ -2273,7 +2273,7 @@ def admin_tokens(db: sqlite3.Connection = Depends(get_db), _ok=Depends(require_a
 
 @app.post("/api/admin/tokens")
 def admin_issue_token(body: AdminTokenIssue, db: sqlite3.Connection = Depends(get_db),
-                      request: Request = None, _ok=Depends(require_admin)):
+                      _ok=Depends(require_admin)):
     ids = body.project_ids or [p["id"] for p in R.ProjectRepo.list(db)]
     if not ids:
         raise HTTPException(status_code=400, detail="尚无可授权的项目，请先创建项目")
@@ -2282,14 +2282,13 @@ def admin_issue_token(body: AdminTokenIssue, db: sqlite3.Connection = Depends(ge
     except auth.TokenExpiryError as e:
         _token_expiry_error(e)
     tok = auth.TokenService.issue(db, ids, expires_at=expires_at, note=body.note)
-    base = str(request.base_url).rstrip("/") if request else "http://localhost:8000"
     row = R.TokenRepo.get(db, _token_id(db, tok))
     audit.log("token.issue", target_type="token", target_id=row["id"] if row else None,
               target_name=audit.mask_token(tok),
               detail={"project_ids": ids, "expires_at": expires_at, "note": body.note or ""})
     return {
         "token": tok,
-        "link": f"{base}/?token={tok}",
+        "link": f"{public_share_base()}/?token={tok}",
         "project_ids": ids,
         "expires_at": expires_at,
         "note": body.note or "",
@@ -2304,14 +2303,13 @@ def _token_id(db, tok: str):
 
 @app.get("/api/admin/tokens/{tid}/reveal")
 def admin_reveal_token(tid: int, db: sqlite3.Connection = Depends(get_db),
-                       request: Request = None, _ok=Depends(require_admin)):
+                       _ok=Depends(require_admin)):
     """查看已签发令牌的完整原文（不再只在签发瞬间可见一次）。"""
     t = R.TokenRepo.get(db, tid)
     if t is None:
         raise HTTPException(status_code=404, detail="令牌不存在或已被吊销")
-    base = str(request.base_url).rstrip("/") if request else "http://localhost:8000"
     row = _token_row(t)
-    row.update({"token": t["token"], "link": f"{base}/?token={t['token']}"})
+    row.update({"token": t["token"], "link": f"{public_share_base()}/?token={t['token']}"})
     # 明文令牌被读走是这个平台风险最高的一件事：必须留痕，且只留脱敏串
     audit.log("token.reveal", target_type="token", target_id=tid,
               target_name=audit.mask_token(t["token"]),

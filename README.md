@@ -21,7 +21,7 @@ via conversation in an immersive workbench to modify project code directly.
 
 Janus 是一个本地部署的 Web 平台，解决一个典型痛点：**业务人员有改需求，但不会（也不应该）直接碰代码仓库。**
 
-管理员把本地项目登记到平台并签发访问令牌，业务人员拿到形如 `http://host:8000/?token=xxx` 的链接后，
+管理员把本地项目登记到平台并签发访问令牌，业务人员拿到形如 `http://<局域网IP>:5173/?token=xxx` 的链接后，
 无需账号体系即可进入项目空间，创建需求并进入**沉浸式工作台**：顶部是四阶段工作流
 （需求澄清 → 用例配置 → 编码实现 → 归档验收），左栏随阶段切换（需求文档 / 用例 / 文件树与改动记录 / 归档汇总），
 右栏始终是与 Coding Agent 的对话。Agent 的每次运行都会实时流式回显 diff 与测试结果，
@@ -158,7 +158,7 @@ coding-agent-platform/
 Janus is a locally deployed web platform that solves a classic pain point: **business people need changes, but shouldn't touch the codebase directly.**
 
 An admin registers local projects and issues access tokens. Stakeholders open a link like
-`http://host:8000/?token=xxx` — no account system needed — enter the project space, create a requirement,
+`http://<LAN-IP>:5173/?token=xxx` — no account system needed — enter the project space, create a requirement,
 and step into the **immersive workbench**: a four-phase workflow on top
 (requirement clarification → use case configuration → coding → archive & acceptance), a left pane that
 switches per phase (requirement doc / use cases / file tree & change records / archive summary), and a

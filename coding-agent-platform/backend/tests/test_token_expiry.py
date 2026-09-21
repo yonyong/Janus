@@ -25,11 +25,6 @@ def _make_project(conn, name="demo"):
     return R.ProjectRepo.create(conn, name, f"/tmp/{name}")["id"]
 
 
-def _fake_request():
-    # request=None 时端点回退到 http://localhost:8000，足以验证 link 拼接
-    return None
-
-
 # ---------------- 有效期四种模式 + 永不过期 ----------------
 
 def test_compute_expiry_modes():
@@ -71,13 +66,13 @@ def test_issue_with_note():
     conn = get_conn(); init_db(conn); _new(conn)
     pid = _make_project(conn)
     r = app_module.admin_issue_token(
-        AdminTokenIssue(project_ids=[pid], note="给张三临时试用"), db=conn, request=_fake_request(), _ok=True
+        AdminTokenIssue(project_ids=[pid], note="给张三临时试用"), db=conn, _ok=True
     )
     assert r["note"] == "给张三临时试用"
     # 列表与原文查看都应带回备注
     listed = app_module.admin_tokens(db=conn, _ok=True)
     assert listed[0]["note"] == "给张三临时试用"
-    revealed = app_module.admin_reveal_token(tid=listed[0]["id"], db=conn, request=_fake_request(), _ok=True)
+    revealed = app_module.admin_reveal_token(tid=listed[0]["id"], db=conn, _ok=True)
     assert revealed["note"] == "给张三临时试用"
 
 
@@ -87,15 +82,15 @@ def test_reveal_full_token():
     conn = get_conn(); init_db(conn); _new(conn)
     pid = _make_project(conn)
     r = app_module.admin_issue_token(
-        AdminTokenIssue(project_ids=[pid], note="n"), db=conn, request=_fake_request(), _ok=True
+        AdminTokenIssue(project_ids=[pid], note="n"), db=conn, _ok=True
     )
     tok = r["token"]
-    revealed = app_module.admin_reveal_token(tid=r["id"], db=conn, request=_fake_request(), _ok=True)
+    revealed = app_module.admin_reveal_token(tid=r["id"], db=conn, _ok=True)
     assert revealed["token"] == tok
     assert revealed["link"].endswith(f"?token={tok}")
     # 不存在的令牌返回 404
     try:
-        app_module.admin_reveal_token(tid=99999, db=conn, request=_fake_request(), _ok=True)
+        app_module.admin_reveal_token(tid=99999, db=conn, _ok=True)
         assert False, "不存在的令牌应 404"
     except HTTPException as e:
         assert e.status_code == 404
@@ -123,7 +118,7 @@ def test_update_note_and_expiry():
     conn = get_conn(); init_db(conn); _new(conn)
     pid = _make_project(conn)
     r = app_module.admin_issue_token(
-        AdminTokenIssue(project_ids=[pid], note="原备注", ttl_days=7), db=conn, request=_fake_request(), _ok=True
+        AdminTokenIssue(project_ids=[pid], note="原备注", ttl_days=7), db=conn, _ok=True
     )
     tid = r["id"]
 
@@ -154,7 +149,7 @@ def test_update_invalid_expiry_400():
     conn = get_conn(); init_db(conn); _new(conn)
     pid = _make_project(conn)
     r = app_module.admin_issue_token(
-        AdminTokenIssue(project_ids=[pid], note="n"), db=conn, request=_fake_request(), _ok=True
+        AdminTokenIssue(project_ids=[pid], note="n"), db=conn, _ok=True
     )
     try:
         app_module.admin_update_token(
