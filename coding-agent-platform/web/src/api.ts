@@ -607,13 +607,21 @@ export interface AcceptRunResult {
   sync?: { found: boolean; rows: number; updated: number; stats: Record<string, number> } | null
 }
 
+/** 选项参数的一项：value 传给 CLI，label 仅用于下拉展示。 */
+export interface ScriptParamOption {
+  value: string
+  label: string
+}
+
 /** 通用脚本参数定义（来自 YAML frontmatter）。 */
 export interface ScriptParamDef {
   name: string
   label: string
-  type: 'string' | 'number' | 'boolean'
+  type: 'string' | 'number' | 'boolean' | 'select'
   default?: string | number | boolean | null
   required?: boolean
+  /** type=select 时的可选项；填写时以下拉选择，不能自由输入。 */
+  options?: ScriptParamOption[]
 }
 
 /** 列表项 / 详情共用的脚本元信息。 */

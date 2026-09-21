@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   App as AntdApp,
   Button,
-  Drawer,
   Empty,
   Form,
   Input,
   InputNumber,
   Modal,
+  Segmented,
   Select,
   Space,
   Switch,
@@ -18,7 +18,6 @@ import {
   CodeOutlined,
   DeleteOutlined,
   EditOutlined,
-  FormOutlined,
   PlayCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -38,6 +37,39 @@ import {
   saveScript,
 } from '../api'
 import { scriptAssistPrompt } from './FlowCommands'
+import { CodeView } from './FileViewer'
+
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
+
+const SORT_KEY = 'cap_script_list_sort'
+type ScriptSort = 'name-asc' | 'name-desc' | 'mtime-desc' | 'mtime-asc'
+
+function loadSort(): ScriptSort {
+  try {
+    const v = localStorage.getItem(SORT_KEY)
+    if (v === 'name-asc' || v === 'name-desc' || v === 'mtime-desc' || v === 'mtime-asc') return v
+  } catch {
+    /* localStorage 不可用时回落默认 */
+  }
+  return 'name-asc'
+}
+
+function compareName(a: ScriptItem, b: ScriptItem): number {
+  const an = a.display_name || a.name
+  const bn = b.display_name || b.name
+  const byDisplay = an.localeCompare(bn, 'zh')
+  return byDisplay || a.name.localeCompare(b.name, 'zh')
+}
+
+function compareMtime(a: ScriptItem, b: ScriptItem): number {
+  return (a.mtime || '').localeCompare(b.mtime || '') || compareName(a, b)
+}
+
+/** 从脚本文件名取扩展名，供语法高亮映射。 */
+function extOf(name: string): string {
+  const i = name.lastIndexOf('.')
+  return i >= 0 ? name.slice(i + 1).toLowerCase() : ''
+}
 
 const DEFAULT_TEMPLATE = (display: string) => `---
 name: ${display}
@@ -77,8 +109,9 @@ function missingRequired(params: ScriptParamDef[], values: Record<string, string
 }
 
 /**
- * 通用脚本面板：.janus/{dir}/script/ 列表，支持参数 / 编辑 / 执行 / 日志 / AI 协助。
+ * 通用脚本面板：.janus/{dir}/script/ 列表，支持编辑 / 执行确认 / 日志 / AI 协助。
  * 与用例面板的 usecase/accept.* 总验收脚本分离。
+ * 点「执行」一律先弹确认框（有参数则填写，无参数也需确认）再跑。
  */
 export default function ScriptPane({
   token,
@@ -100,13 +133,15 @@ export default function ScriptPane({
   const [loading, setLoading] = useState(false)
   const [runningName, setRunningName] = useState<string | null>(null)
 
-  const [paramOpen, setParamOpen] = useState<ScriptItem | null>(null)
+  const [runOpen, setRunOpen] = useState<ScriptItem | null>(null)
   const [paramValues, setParamValues] = useState<Record<string, string | number | boolean>>({})
 
   const [editOpen, setEditOpen] = useState(false)
   const [editName, setEditName] = useState('')
   const [editContent, setEditContent] = useState('')
   const [editSaving, setEditSaving] = useState(false)
+  /** preview=语法高亮渲染；edit=源码编辑。 */
+  const [editView, setEditView] = useState<'preview' | 'edit'>('edit')
 
   const [logsOpen, setLogsOpen] = useState(false)
   const [logsName, setLogsName] = useState('')
@@ -117,6 +152,7 @@ export default function ScriptPane({
   const [createOpen, setCreateOpen] = useState(false)
   const [createStem, setCreateStem] = useState('new_script')
   const [createExt, setCreateExt] = useState<'py' | 'sh' | 'js' | 'mjs'>('py')
+  const [sortBy, setSortBy] = useState<ScriptSort>(() => loadSort())
 
   const disabled = rid === null || !dir
 
@@ -143,9 +179,9 @@ export default function ScriptPane({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rid, token, refreshSignal])
 
-  const openParams = (item: ScriptItem) => {
+  const openRunConfirm = (item: ScriptItem) => {
     setParamValues(buildInitialParams(item))
-    setParamOpen(item)
+    setRunOpen(item)
   }
 
   const doRun = async (item: ScriptItem, values: Record<string, string | number | boolean>) => {
@@ -153,7 +189,6 @@ export default function ScriptPane({
     const miss = missingRequired(item.params, values)
     if (miss.length) {
       message.warning(`请填写必填参数：${miss.map((p) => p.label || p.name).join('、')}`)
-      openParams(item)
       return
     }
     setRunningName(item.name)
@@ -163,6 +198,7 @@ export default function ScriptPane({
         message.error(`未能执行：${r.reason || '未知原因'}${r.detail ? ' · ' + r.detail : ''}`)
         return
       }
+      setRunOpen(null)
       message[r.exit_code === 0 ? 'success' : 'warning'](
         `已执行 ${item.name}（退出码 ${r.exit_code}，${r.duration_ms ?? 0}ms）`,
       )
@@ -184,16 +220,7 @@ export default function ScriptPane({
   }
 
   const onExecuteClick = (item: ScriptItem) => {
-    const values = buildInitialParams(item)
-    const miss = missingRequired(item.params, values)
-    if (miss.length || (item.params || []).length > 0) {
-      // 有参数时优先打开参数表（预填上次），避免误跑；无必填缺省可直接点「执行」
-      if (miss.length) {
-        openParams(item)
-        return
-      }
-    }
-    void doRun(item, values)
+    openRunConfirm(item)
   }
 
   const openEdit = async (item: ScriptItem) => {
@@ -202,6 +229,7 @@ export default function ScriptPane({
       const full = await getScript(token, rid, item.name)
       setEditName(full.name)
       setEditContent(full.content || '')
+      setEditView('edit')
       setEditOpen(true)
     } catch (e) {
       const info = describeError(e)
@@ -273,10 +301,29 @@ export default function ScriptPane({
       await load(true)
       setEditName(name)
       setEditContent(DEFAULT_TEMPLATE(stem))
+      setEditView('edit')
       setEditOpen(true)
     } catch (e) {
       const info = describeError(e)
       message.error(`${info.title}${info.detail ? '：' + info.detail : ''}`)
+    }
+  }
+
+  const sortedItems = useMemo(() => {
+    const list = [...items]
+    if (sortBy === 'name-desc') list.sort((a, b) => compareName(b, a))
+    else if (sortBy === 'mtime-desc') list.sort((a, b) => compareMtime(b, a))
+    else if (sortBy === 'mtime-asc') list.sort(compareMtime)
+    else list.sort(compareName)
+    return list
+  }, [items, sortBy])
+
+  const changeSort = (v: ScriptSort) => {
+    setSortBy(v)
+    try {
+      localStorage.setItem(SORT_KEY, v)
+    } catch {
+      /* ignore */
     }
   }
 
@@ -285,8 +332,8 @@ export default function ScriptPane({
   }
 
   const paramForm = useMemo(() => {
-    if (!paramOpen) return null
-    return (paramOpen.params || []).map((p) => {
+    if (!runOpen) return null
+    return (runOpen.params || []).map((p) => {
       const val = paramValues[p.name]
       if (p.type === 'boolean') {
         return (
@@ -309,6 +356,19 @@ export default function ScriptPane({
           </Form.Item>
         )
       }
+      if (p.type === 'select') {
+        return (
+          <Form.Item key={p.name} label={p.label || p.name} required={p.required}>
+            <Select
+              style={{ width: '100%' }}
+              placeholder="请选择"
+              value={val === undefined || val === null || val === '' ? undefined : String(val)}
+              options={(p.options || []).map((o) => ({ value: o.value, label: o.label || o.value }))}
+              onChange={(v) => setParamValues((prev) => ({ ...prev, [p.name]: v }))}
+            />
+          </Form.Item>
+        )
+      }
       return (
         <Form.Item key={p.name} label={p.label || p.name} required={p.required}>
           <Input
@@ -318,7 +378,7 @@ export default function ScriptPane({
         </Form.Item>
       )
     })
-  }, [paramOpen, paramValues])
+  }, [runOpen, paramValues])
 
   if (disabled) {
     return (
@@ -335,6 +395,18 @@ export default function ScriptPane({
           目录 .janus/{dir}/script/
         </Typography.Text>
         <Space size={6} wrap>
+          <Select
+            size="small"
+            value={sortBy}
+            style={{ width: 120 }}
+            onChange={changeSort}
+            options={[
+              { value: 'name-asc', label: '名称 A→Z' },
+              { value: 'name-desc', label: '名称 Z→A' },
+              { value: 'mtime-desc', label: '最近修改' },
+              { value: 'mtime-asc', label: '最早修改' },
+            ]}
+          />
           <Button size="small" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
             新建
           </Button>
@@ -366,7 +438,7 @@ export default function ScriptPane({
         </Empty>
       ) : (
         <div className="script-list">
-          {items.map((it) => {
+          {sortedItems.map((it) => {
             const running = runningName === it.name
             return (
               <div key={it.name} className="script-row">
@@ -386,14 +458,6 @@ export default function ScriptPane({
                   </div>
                 </div>
                 <div className="script-row-actions">
-                  <Tooltip title="参数">
-                    <Button
-                      size="small"
-                      icon={<FormOutlined />}
-                      disabled={running}
-                      onClick={() => openParams(it)}
-                    />
-                  </Tooltip>
                   <Tooltip title="编辑">
                     <Button
                       size="small"
@@ -435,58 +499,108 @@ export default function ScriptPane({
         </div>
       )}
 
-      <Drawer
-        title={paramOpen ? `参数 · ${paramOpen.display_name || paramOpen.name}` : '参数'}
-        open={!!paramOpen}
-        onClose={() => setParamOpen(null)}
-        width={400}
-        destroyOnClose
-        extra={
-          <Button
-            type="primary"
-            loading={!!runningName}
-            onClick={() => {
-              if (!paramOpen) return
-              void doRun(paramOpen, paramValues).then(() => setParamOpen(null))
-            }}
-          >
-            保存参数并执行
-          </Button>
+      <Modal
+        title={runOpen ? `执行 · ${runOpen.display_name || runOpen.name}` : '执行'}
+        open={!!runOpen}
+        onCancel={() => setRunOpen(null)}
+        width={480}
+        destroyOnHidden
+        footer={
+          <Space>
+            <Button onClick={() => setRunOpen(null)}>取消</Button>
+            <Button
+              type="primary"
+              icon={<PlayCircleOutlined />}
+              loading={!!runningName}
+              onClick={() => {
+                if (!runOpen) return
+                void doRun(runOpen, paramValues)
+              }}
+            >
+              确认执行
+            </Button>
+          </Space>
         }
       >
-        {(paramOpen?.params || []).length === 0 ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该脚本未声明参数" />
+        {(runOpen?.params || []).length === 0 ? (
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+            该脚本没有需要填写的参数，确认后立即执行 <Typography.Text code>{runOpen?.name}</Typography.Text>。
+          </Typography.Paragraph>
         ) : (
           <Form layout="vertical">{paramForm}</Form>
         )}
-      </Drawer>
+      </Modal>
 
-      <Drawer
-        title={`编辑 · ${editName}`}
+      <Modal
+        title={
+          <Space size={8} wrap>
+            <CodeOutlined style={{ color: 'var(--primary)' }} />
+            <span>编辑 · {editName}</span>
+          </Space>
+        }
         open={editOpen}
-        onClose={() => setEditOpen(false)}
-        width={560}
-        destroyOnClose
-        extra={
-          <Button type="primary" loading={editSaving} onClick={() => void saveEdit()}>
-            保存
-          </Button>
+        onCancel={() => setEditOpen(false)}
+        width="92vw"
+        style={{ top: 24, maxWidth: '92vw', paddingBottom: 0 }}
+        wrapClassName="script-edit-modal"
+        destroyOnHidden
+        footer={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-4)' }}>
+              {editView === 'edit' ? 'Ctrl / ⌘ + S 保存' : '切换到「源码」可编辑'}
+            </span>
+            <Space>
+              <Button onClick={() => setEditOpen(false)}>关闭</Button>
+              <Button type="primary" loading={editSaving} disabled={editView === 'preview'} onClick={() => void saveEdit()}>
+                保存
+              </Button>
+            </Space>
+          </div>
         }
       >
-        <Input.TextArea
-          value={editContent}
-          onChange={(e) => setEditContent(e.target.value)}
-          autoSize={{ minRows: 18, maxRows: 36 }}
-          style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}
-        />
-      </Drawer>
+        <div className="script-edit-stage">
+          <div style={{ marginBottom: 10 }}>
+            <Segmented
+              size="small"
+              value={editView}
+              onChange={(v) => setEditView(v as 'preview' | 'edit')}
+              options={[
+                { label: '语法高亮', value: 'preview' },
+                { label: '源码', value: 'edit' },
+              ]}
+            />
+          </div>
+          {editView === 'preview' ? (
+            <div className="script-edit-preview">
+              <CodeView code={editContent} ext={extOf(editName)} />
+            </div>
+          ) : (
+            <Input.TextArea
+              value={editContent}
+              spellCheck={false}
+              onChange={(e) => setEditContent(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                  e.preventDefault()
+                  void saveEdit()
+                }
+              }}
+              className="script-edit-source"
+              style={{ fontFamily: MONO, fontSize: 12.5, lineHeight: 1.6 }}
+            />
+          )}
+        </div>
+      </Modal>
 
-      <Drawer
-        title={`日志 · ${logsName}`}
+      <Modal
+        title={`执行日志 · ${logsName}`}
         open={logsOpen}
-        onClose={() => setLogsOpen(false)}
-        width={560}
-        destroyOnClose
+        onCancel={() => setLogsOpen(false)}
+        width={780}
+        destroyOnHidden
+        footer={
+          <Button onClick={() => setLogsOpen(false)}>关闭</Button>
+        }
       >
         {logsLoading ? (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="加载中…" />
@@ -523,7 +637,7 @@ export default function ScriptPane({
             )}
           </div>
         )}
-      </Drawer>
+      </Modal>
 
       <Modal
         title="新建脚本"

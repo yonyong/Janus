@@ -79,6 +79,53 @@ def test_safe_name_rejects_traversal():
         pass
 
 
+def test_select_param_options_and_reject_unknown():
+    conn = _db()
+    root, rq = _fixture(conn)
+    d = rq["dir_name"]
+    content = """---
+name: 服务控制
+params:
+  - name: action
+    label: 动作
+    type: select
+    options: [启动, 停止]
+    default: 启动
+    required: true
+---
+import sys
+print('ARGS', sys.argv[1:])
+"""
+    SCR.write_script(root, d, "svc.py", content)
+    item = SCR.list_scripts(root, d)[0]
+    action = next(p for p in item["params"] if p["name"] == "action")
+    assert action["type"] == "select"
+    assert action["options"] == [
+        {"value": "启动", "label": "启动"},
+        {"value": "停止", "label": "停止"},
+    ]
+    res = SCR.run_script(root, d, "svc.py", {"action": "停止"})
+    assert res["ran"] is True and res["exit_code"] == 0
+    assert "--action" in res["output"] and "停止" in res["output"]
+    try:
+        SCR.run_script(root, d, "svc.py", {"action": "重启"})
+        assert False, "should raise"
+    except SCR.ScriptError as e:
+        assert "只能选择" in e.message
+
+
+def test_select_accepts_labeled_options():
+    meta, _ = SCR.parse_frontmatter(
+        "---\nparams:\n  - name: mode\n    type: enum\n    options:\n"
+        "      - value: start\n        label: 启动\n"
+        "      - value: stop\n        label: 停止\n---\nprint(1)\n"
+    )
+    params = SCR._normalize_params(meta)
+    assert params[0]["type"] == "select"
+    assert params[0]["options"][0] == {"value": "start", "label": "启动"}
+    assert params[0]["options"][1]["value"] == "stop"
+
+
 def test_parse_frontmatter_plain():
     meta, body = SCR.parse_frontmatter("print(1)\n")
     assert meta == {} and body == "print(1)\n"
