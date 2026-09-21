@@ -121,6 +121,21 @@ export function buildAntdTheme(mode: ThemeMode): ThemeConfig {
         }
       : {}
 
+  const darkMenu = meta.dark
+    ? {
+        itemSelectedBg: mode === 'slate' ? '#1e2c4d' : '#1f2b45',
+        itemSelectedColor: '#5b8cff',
+        itemHoverBg: mode === 'slate' ? '#273657' : '#2b313d',
+        itemActiveBg: mode === 'slate' ? '#1e2c4d' : '#1f2b45',
+      }
+    : mode === 'paper'
+      ? {
+          itemSelectedBg: '#e3efe6',
+          itemSelectedColor: '#2f7d5b',
+          itemHoverBg: '#ede4cf',
+        }
+      : {}
+
   return {
     ...base,
     algorithm: meta.dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
@@ -130,6 +145,10 @@ export function buildAntdTheme(mode: ThemeMode): ThemeConfig {
       Button: {
         ...(base.components?.Button || {}),
         ...darkBtn,
+      },
+      Menu: {
+        ...(base.components?.Menu || {}),
+        ...darkMenu,
       },
       // 暗系下让 Layout 的头/侧/底跟随容器色，避免亮色算法遗留的白条
       Layout: {

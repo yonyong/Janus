@@ -127,7 +127,7 @@
   --bg-sunken: #0a0b0f;
   /* 对话井更深；气泡比面板再抬一档，避免与 --bg-elevated 面板同色 */
   --bg-chat: #12141a;
-  --bg-bubble: #2a303b;
+  --bg-bubble: #323944;
   --shadow-bubble: 0 4px 18px rgba(0, 0, 0, 0.42);
   /* 软填充替代近白实底，降低暗色下的刺眼对比 */
   --btn-default-bg: rgba(255, 255, 255, 0.06);
@@ -171,7 +171,7 @@
   --bg-hover: #273657;
   --bg-sunken: #060a14;
   --bg-chat: #0c1426;
-  --bg-bubble: #2a3a58;
+  --bg-bubble: #314668;
   --shadow-bubble: 0 4px 20px rgba(0, 0, 0, 0.48);
   --btn-default-bg: rgba(226, 232, 245, 0.07);
   --btn-default-bg-hover: rgba(226, 232, 245, 0.12);
@@ -4013,8 +4013,8 @@ pre.diff {
 }
 
 .wfa-rail-item.is-active {
-  background: linear-gradient(180deg, #eef4ff, #e6efff);
-  border-color: #c9d8ff;
+  background: var(--tint-primary);
+  border-color: var(--tint-primary-border);
   color: var(--primary);
   font-weight: 600;
 }
