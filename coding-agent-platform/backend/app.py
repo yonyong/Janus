@@ -1780,7 +1780,20 @@ async def stream_events(
                     yield f"data: {json.dumps(d, ensure_ascii=False)}\n\n"
             finally:
                 conn2.close()
-            yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+            done: dict = {"type": "done"}
+            # 幂等回放也带上落库的耗时 / Token，前端收口气泡与刷新后展示一致
+            agent_tail = [m for m in msgs[last_user_idx + 1:] if m.get("role") == "agent"]
+            if agent_tail:
+                last = agent_tail[-1]
+                if last.get("elapsed_ms") is not None:
+                    done["elapsed_ms"] = last["elapsed_ms"]
+                u = {}
+                for k in ("prompt_tokens", "completion_tokens", "total_tokens"):
+                    if last.get(k) is not None:
+                        u[k] = last[k]
+                if u:
+                    done["usage"] = u
+            yield f"data: {json.dumps(done, ensure_ascii=False)}\n\n"
             return
 
         # live / new：订阅后台 run 的实时流（payload 已含 diff，无需重算）

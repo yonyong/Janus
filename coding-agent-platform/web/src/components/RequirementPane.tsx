@@ -1,12 +1,15 @@
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState } from 'react'
-import { Avatar, Empty, Modal, Select, Space, Spin, Typography } from 'antd'
+import { Alert, Avatar, Button, Empty, Modal, Select, Space, Spin, Typography } from 'antd'
 import {
   ArrowRightOutlined,
   BulbOutlined,
+  CloseOutlined,
   FileImageOutlined,
   FileOutlined,
+  PlusOutlined,
   RobotOutlined,
   UserOutlined,
+  WarningOutlined,
 } from '@ant-design/icons'
 import ChatPanel, { type ChatPanelHandle } from './ChatPanel'
 import RichText from './RichText'
@@ -14,6 +17,14 @@ import AgentMarkdown from './AgentMarkdown'
 import FilePreview, { previewKindOf, hasPreviewMode } from './FileViewer'
 import { parseMessage, extOf, type ChatAttachment } from '../chatAttachments'
 import { uploadSessionAttachments, readFile, type Agent } from '../api'
+import {
+  SESSION_ROUND_HINT,
+  fmtElapsed,
+  fmtTokens,
+  hasRunMeta,
+  isTokenWarn,
+  type RunMeta,
+} from '../runMeta'
 
 /** 供父组件（如 Workbench）把快捷指令文本灌入输入框，不自动发送。 */
 export interface RequirementPaneHandle {
@@ -21,7 +32,7 @@ export interface RequirementPaneHandle {
   focus: () => void
 }
 
-export interface ChatMessage {
+export interface ChatMessage extends RunMeta {
   role: string
   content: string
 }
@@ -73,6 +84,8 @@ const RequirementPane = forwardRef<
     onChangeAgent?: (agentId: number) => void
     /** 切换 Agent 请求进行中。 */
     agentSwitching?: boolean
+    /** 用户轮次过多时点「新建会话」。 */
+    onNewSession?: () => void
   }
 >(function RequirementPane({
   messages,
@@ -92,11 +105,42 @@ const RequirementPane = forwardRef<
   agentId = null,
   onChangeAgent,
   agentSwitching = false,
+  onNewSession,
 }, ref) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const chatRef = useRef<ChatPanelHandle>(null)
   // 历史消息文件预览：点击附件 chip 打开
   const [preview, setPreview] = useState<{ path: string; ext: string; content: string; name: string } | null>(null)
+  const [hintDismissed, setHintDismissed] = useState(false)
+
+  useEffect(() => {
+    setHintDismissed(false)
+  }, [sid])
+
+  const userRounds = messages.filter((m) => m.role === 'user').length
+  const showSessionHint =
+    !!onNewSession && !hintDismissed && userRounds >= SESSION_ROUND_HINT
+
+  const MetaFooter = ({ meta }: { meta: RunMeta }) => {
+    if (!hasRunMeta(meta)) return null
+    const warn = isTokenWarn(meta)
+    const parts: string[] = []
+    const elapsed = fmtElapsed(meta.elapsed_ms)
+    if (elapsed) parts.push(`耗时 ${elapsed}`)
+    if (meta.prompt_tokens != null) parts.push(`输入 ${fmtTokens(meta.prompt_tokens)}`)
+    if (meta.completion_tokens != null) parts.push(`输出 ${fmtTokens(meta.completion_tokens)}`)
+    if (meta.total_tokens != null && meta.prompt_tokens == null && meta.completion_tokens == null) {
+      parts.push(`合计 ${fmtTokens(meta.total_tokens)}`)
+    }
+    if (!parts.length) return null
+    return (
+      <div className={`msg-run-meta${warn ? ' is-warn' : ''}`} title={warn ? '本次用量较高，建议新开会话以降低后续成本' : undefined}>
+        {warn && <WarningOutlined className="msg-run-meta-icon" />}
+        <span>{parts.join(' · ')}</span>
+        {warn && <span className="msg-run-meta-tip">用量较高，建议新开会话</span>}
+      </div>
+    )
+  }
 
   const uploadFiles = sid
     ? async (files: File[]): Promise<ChatAttachment[]> => {
@@ -158,6 +202,27 @@ const RequirementPane = forwardRef<
 
   return (
     <div className="chat-pane">
+      {showSessionHint && (
+        <Alert
+          className="chat-session-hint"
+          type="warning"
+          showIcon
+          closable
+          closeIcon={<CloseOutlined />}
+          onClose={() => setHintDismissed(true)}
+          message="同会话上下文会越积越大，Token 容易飙升"
+          description={
+            <span>
+              本会话已进行 {userRounds} 轮对话。若任务可独立，建议新开会话继续，避免续聊把历史反复送进模型。
+            </span>
+          }
+          action={
+            <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => onNewSession?.()} disabled={busy}>
+              新建会话
+            </Button>
+          }
+        />
+      )}
       <div className="chat-scroll" ref={scrollRef}>
         {messages.length === 0 && !busy ? (
           <Empty
@@ -191,7 +256,10 @@ const RequirementPane = forwardRef<
                       )
                     })()
                   ) : (
-                    <AgentMarkdown text={m.content} />
+                    <>
+                      <AgentMarkdown text={m.content} />
+                      <MetaFooter meta={m} />
+                    </>
                   )}
                 </div>
               </div>

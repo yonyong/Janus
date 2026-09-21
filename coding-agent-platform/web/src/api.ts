@@ -86,6 +86,11 @@ export interface Message {
   content: string
   has_edit: number
   created_at: string
+  /** 本轮 Agent 运行耗时（毫秒）；仅 agent 消息可能有值。 */
+  elapsed_ms?: number | null
+  prompt_tokens?: number | null
+  completion_tokens?: number | null
+  total_tokens?: number | null
 }
 
 export interface AgentEvent {

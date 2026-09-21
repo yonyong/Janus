@@ -19,6 +19,7 @@ class FakeAgentAdapter:
             f.write(f"# requirement\n{message}\n")
         yield AgentEvent(type="edit", pane="code", text=f"modified {target}",
                          payload={"path": target})
-        yield AgentEvent(type="message", pane="message", text=f"已根据需求修改：{message}")
+        yield AgentEvent(type="message", pane="message", text=f"已根据需求修改：{message}",
+                         payload={"usage": {"prompt_tokens": 12, "completion_tokens": 8, "total_tokens": 20}})
         yield AgentEvent(type="test", pane="test",
                          payload={"cmd": "pytest", "passed": True, "output": "1 passed"})

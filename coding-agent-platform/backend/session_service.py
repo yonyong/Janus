@@ -43,6 +43,9 @@ class _RunState:
         # abort_requested 只做展示用途，真正的终止以 task.cancel() 为准。
         self.task: asyncio.Task | None = None
         self.abort_requested = False
+        # 运行收尾元信息：stream_run 的 done 事件带给前端，对话气泡底部展示
+        self.elapsed_ms: int | None = None
+        self.usage: dict | None = None
 
 
 def _notify(state):
@@ -247,7 +250,12 @@ class SessionService:
             if q in state.subscribers:
                 state.subscribers.remove(q)
             _maybe_cleanup(run_id, state)
-        yield {"type": "done"}
+        done = {"type": "done"}
+        if state.elapsed_ms is not None:
+            done["elapsed_ms"] = state.elapsed_ms
+        if state.usage:
+            done["usage"] = state.usage
+        yield done
 
 
 def _diff_summary(diff: str) -> str:
@@ -417,12 +425,21 @@ async def _run_agent(run_id, session_id, message):
         LOG.emit(pid, error, level="error", source="session", meta={"session_id": session_id})
         _publish(state, {"type": "error", "text": error})
     finally:
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
+        state.elapsed_ms = elapsed_ms
+        state.usage = usage if isinstance(usage, dict) and usage else None
+        # 先把耗时 / Token 挂到最近一条 agent 消息，再关连接与置 done（订阅者依赖这些字段）
         if conn is not None:
+            try:
+                if sess is not None:
+                    R.MessageRepo.attach_run_meta(conn, session_id, elapsed_ms, usage)
+            except Exception as e:  # noqa: BLE001 - 元信息失败不该盖掉审计留痕
+                LOG.emit(pid, f"写入对话用量元信息失败：{e}", level="warn", source="session",
+                         meta={"session_id": session_id})
             conn.close()
         state.done = True
         _notify(state)
         _maybe_cleanup(run_id, state)
-        elapsed_ms = int((time.perf_counter() - started) * 1000)
         # Agent 自己吐了 error 事件也是失败：codebuddy 把「CLI 没给出任何输出」这类情况
         # 报成 error 事件而不是抛异常，若只看 exception，日志会把它写成「成功」——
         # 实时日志与调用留痕必须说同一件事，两处都用这个合并后的结论。

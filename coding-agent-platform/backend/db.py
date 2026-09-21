@@ -70,6 +70,11 @@ CREATE TABLE IF NOT EXISTS messages(
   pane TEXT NOT NULL DEFAULT 'message',
   content TEXT NOT NULL,
   has_edit INTEGER DEFAULT 0,
+  -- 本轮 Agent 运行收尾用量（仅 agent 消息有意义；刷新后对话区仍能展示）
+  elapsed_ms INTEGER,
+  prompt_tokens INTEGER,
+  completion_tokens INTEGER,
+  total_tokens INTEGER,
   created_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY(session_id) REFERENCES sessions(id)
 );
@@ -240,6 +245,11 @@ _MIGRATIONS = [
     ("sessions", "cli_session_id", "TEXT"),
     # 人工验收项标记（不进总验收脚本，人在页面勾选）
     ("test_cases", "is_manual", "INTEGER NOT NULL DEFAULT 0"),
+    # Agent 答复气泡底部展示的本次运行耗时 / Token（老库补列）
+    ("messages", "elapsed_ms", "INTEGER"),
+    ("messages", "prompt_tokens", "INTEGER"),
+    ("messages", "completion_tokens", "INTEGER"),
+    ("messages", "total_tokens", "INTEGER"),
 ]
 
 
