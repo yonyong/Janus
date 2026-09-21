@@ -162,6 +162,7 @@ def agent_context_brief(dir_name: str) -> str:
         "文件内容为一个 ```json 代码块，对象数组字段 title/steps/expected，导入后平台会删除该文件）\n"
         f"- 编码过程文档（实现说明、决策记录等）：{other_dir(dir_name)}/ 下\n"
         f"- 通用脚本：{script_dir(dir_name)}/ 下（可带 YAML frontmatter 声明 params；"
+        "type 可为 string|number|boolean|select，select 用 options 列出可选项如 [启动, 停止]；"
         "与 usecase/accept.* 总验收脚本分离；诊断输出用普通 print/echo，勿自行改 stdout 编码；"
         "可选落盘只写环境变量 JANUS_SCRIPT_LOG，勿自猜 other/logs）\n"
         f"- 测试报告：{test_result_doc(dir_name)}（必须是 Markdown 表格，表头："

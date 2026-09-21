@@ -42,6 +42,30 @@ import { CodeView } from './FileViewer'
 
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
 
+const SORT_KEY = 'cap_script_list_sort'
+type ScriptSort = 'name-asc' | 'name-desc' | 'mtime-desc' | 'mtime-asc'
+
+function loadSort(): ScriptSort {
+  try {
+    const v = localStorage.getItem(SORT_KEY)
+    if (v === 'name-asc' || v === 'name-desc' || v === 'mtime-desc' || v === 'mtime-asc') return v
+  } catch {
+    /* localStorage 不可用时回落默认 */
+  }
+  return 'name-asc'
+}
+
+function compareName(a: ScriptItem, b: ScriptItem): number {
+  const an = a.display_name || a.name
+  const bn = b.display_name || b.name
+  const byDisplay = an.localeCompare(bn, 'zh')
+  return byDisplay || a.name.localeCompare(b.name, 'zh')
+}
+
+function compareMtime(a: ScriptItem, b: ScriptItem): number {
+  return (a.mtime || '').localeCompare(b.mtime || '') || compareName(a, b)
+}
+
 /** 从脚本文件名取扩展名，供语法高亮映射。 */
 function extOf(name: string): string {
   const i = name.lastIndexOf('.')
@@ -128,6 +152,7 @@ export default function ScriptPane({
   const [createOpen, setCreateOpen] = useState(false)
   const [createStem, setCreateStem] = useState('new_script')
   const [createExt, setCreateExt] = useState<'py' | 'sh' | 'js' | 'mjs'>('py')
+  const [sortBy, setSortBy] = useState<ScriptSort>(() => loadSort())
 
   const disabled = rid === null || !dir
 
@@ -293,6 +318,24 @@ export default function ScriptPane({
     }
   }
 
+  const sortedItems = useMemo(() => {
+    const list = [...items]
+    if (sortBy === 'name-desc') list.sort((a, b) => compareName(b, a))
+    else if (sortBy === 'mtime-desc') list.sort((a, b) => compareMtime(b, a))
+    else if (sortBy === 'mtime-asc') list.sort(compareMtime)
+    else list.sort(compareName)
+    return list
+  }, [items, sortBy])
+
+  const changeSort = (v: ScriptSort) => {
+    setSortBy(v)
+    try {
+      localStorage.setItem(SORT_KEY, v)
+    } catch {
+      /* ignore */
+    }
+  }
+
   const aiAssist = () => {
     onUseCommand(scriptAssistPrompt(dir))
   }
@@ -318,6 +361,19 @@ export default function ScriptPane({
               style={{ width: '100%' }}
               value={typeof val === 'number' ? val : undefined}
               onChange={(n) => setParamValues((v) => ({ ...v, [p.name]: n ?? 0 }))}
+            />
+          </Form.Item>
+        )
+      }
+      if (p.type === 'select') {
+        return (
+          <Form.Item key={p.name} label={p.label || p.name} required={p.required}>
+            <Select
+              style={{ width: '100%' }}
+              placeholder="请选择"
+              value={val === undefined || val === null || val === '' ? undefined : String(val)}
+              options={(p.options || []).map((o) => ({ value: o.value, label: o.label || o.value }))}
+              onChange={(v) => setParamValues((prev) => ({ ...prev, [p.name]: v }))}
             />
           </Form.Item>
         )
@@ -348,6 +404,18 @@ export default function ScriptPane({
           目录 .janus/{dir}/script/
         </Typography.Text>
         <Space size={6} wrap>
+          <Select
+            size="small"
+            value={sortBy}
+            style={{ width: 120 }}
+            onChange={changeSort}
+            options={[
+              { value: 'name-asc', label: '名称 A→Z' },
+              { value: 'name-desc', label: '名称 Z→A' },
+              { value: 'mtime-desc', label: '最近修改' },
+              { value: 'mtime-asc', label: '最早修改' },
+            ]}
+          />
           <Button size="small" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
             新建
           </Button>
@@ -379,7 +447,7 @@ export default function ScriptPane({
         </Empty>
       ) : (
         <div className="script-list">
-          {items.map((it) => {
+          {sortedItems.map((it) => {
             const running = runningName === it.name
             return (
               <div key={it.name} className="script-row">

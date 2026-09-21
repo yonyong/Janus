@@ -73,6 +73,37 @@ def parse_frontmatter(text: str) -> tuple[dict, str]:
     return meta, body
 
 
+_SELECT_TYPES = {"select", "enum", "choice", "option"}
+
+
+def _normalize_options(raw) -> list[dict]:
+    """把 options/choices 收成 ``[{value, label}]``。支持字符串列表或 ``{value, label}``。"""
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    seen: set[str] = set()
+    for item in raw:
+        value = ""
+        label = ""
+        if isinstance(item, str):
+            value = item.strip()
+            label = value
+        elif isinstance(item, (int, float)) and not isinstance(item, bool):
+            value = str(item)
+            label = value
+        elif isinstance(item, dict):
+            raw_val = item.get("value")
+            if raw_val is None:
+                raw_val = item.get("label")
+            value = "" if raw_val is None else str(raw_val).strip()
+            label = str(item.get("label") or value).strip() or value
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        out.append({"value": value, "label": label})
+    return out
+
+
 def _normalize_params(meta: dict) -> list[dict]:
     raw = meta.get("params") or []
     if not isinstance(raw, list):
@@ -85,15 +116,28 @@ def _normalize_params(meta: dict) -> list[dict]:
         if not name:
             continue
         typ = str(p.get("type") or "string").lower()
-        if typ not in ("string", "number", "boolean"):
+        options = _normalize_options(
+            p.get("options") if p.get("options") is not None else p.get("choices")
+        )
+        # 声明了可选项，或 type 为 select/enum：填写时只能从选项里选。
+        if typ in _SELECT_TYPES or (typ == "string" and options):
+            typ = "select" if options else "string"
+        elif typ not in ("string", "number", "boolean", "select"):
             typ = "string"
-        out.append({
+        if typ == "select" and not options:
+            typ = "string"
+        entry = {
             "name": name,
             "label": str(p.get("label") or name),
             "type": typ,
             "default": p.get("default"),
             "required": bool(p.get("required", False)),
-        })
+        }
+        if typ == "select":
+            entry["options"] = options
+            if entry["default"] is not None:
+                entry["default"] = str(entry["default"])
+        out.append(entry)
     return out
 
 
@@ -260,6 +304,11 @@ def _cli_args(params_schema: list[dict], params: dict) -> list[str]:
                 sval = "true" if str(val).strip().lower() in ("1", "true", "yes", "on") else "false"
         elif p["type"] == "number":
             sval = str(val)
+        elif p["type"] == "select":
+            sval = str(val)
+            allowed = [o["value"] for o in (p.get("options") or [])]
+            if allowed and sval not in allowed:
+                raise ScriptError(f"参数 {key} 只能选择: {' / '.join(allowed)}")
         else:
             sval = str(val)
         args.extend([f"--{key}", sval])

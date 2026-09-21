@@ -93,7 +93,8 @@ export const scriptAssistPrompt = (dir: string): string => {
     `请在 ${base}/script/ 下创建或更新一份可执行脚本（优先 .py；也可 .sh / .js / .mjs）。\n` +
     '要求：\n' +
     '1. 文件开头用 YAML frontmatter（用 --- 包裹）声明 name / desc / params；' +
-    'params 每项含 name、label、type（string|number|boolean）、default、required；\n' +
+    'params 每项含 name、label、type（string|number|boolean|select）、default、required；' +
+    'type 为 select 时必须给 options（字符串列表，或 {value, label} 列表），填写时只能从这些选项里选，例如 options: [启动, 停止]；\n' +
     '2. 正文不要依赖 frontmatter（平台执行时会剥掉头部）；参数从命令行以 `--name value` 读取' +
     '（boolean 为 true/false 字符串）；\n' +
     '3. 脚本应能在项目根目录直接运行；写完后在回复里说明文件路径、参数含义与示例命令。\n' +
