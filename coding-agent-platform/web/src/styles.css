@@ -4525,3 +4525,45 @@ pre.diff {
   max-height: 420px;
   overflow: auto;
 }
+
+/* 脚本编辑：接近全屏的模态框 + 源码/语法高亮切换 */
+.script-edit-modal .ant-modal-container {
+  height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+.script-edit-modal .ant-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.script-edit-stage {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.script-edit-preview {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.script-edit-preview .fv-code {
+  max-height: none;
+  min-height: calc(100vh - 240px);
+}
+
+.script-edit-source.ant-input,
+.script-edit-source.ant-input-textarea textarea,
+textarea.script-edit-source {
+  flex: 1;
+  min-height: calc(100vh - 240px) !important;
+  height: calc(100vh - 240px) !important;
+  resize: none;
+}

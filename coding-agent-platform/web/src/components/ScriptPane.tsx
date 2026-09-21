@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   App as AntdApp,
   Button,
-  Drawer,
   Empty,
   Form,
   Input,
   InputNumber,
   Modal,
+  Segmented,
   Select,
   Space,
   Switch,
@@ -38,6 +38,15 @@ import {
   saveScript,
 } from '../api'
 import { scriptAssistPrompt } from './FlowCommands'
+import { CodeView } from './FileViewer'
+
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
+
+/** 从脚本文件名取扩展名，供语法高亮映射。 */
+function extOf(name: string): string {
+  const i = name.lastIndexOf('.')
+  return i >= 0 ? name.slice(i + 1).toLowerCase() : ''
+}
 
 const DEFAULT_TEMPLATE = (display: string) => `---
 name: ${display}
@@ -107,6 +116,8 @@ export default function ScriptPane({
   const [editName, setEditName] = useState('')
   const [editContent, setEditContent] = useState('')
   const [editSaving, setEditSaving] = useState(false)
+  /** preview=语法高亮渲染；edit=源码编辑。 */
+  const [editView, setEditView] = useState<'preview' | 'edit'>('edit')
 
   const [logsOpen, setLogsOpen] = useState(false)
   const [logsName, setLogsName] = useState('')
@@ -202,6 +213,7 @@ export default function ScriptPane({
       const full = await getScript(token, rid, item.name)
       setEditName(full.name)
       setEditContent(full.content || '')
+      setEditView('edit')
       setEditOpen(true)
     } catch (e) {
       const info = describeError(e)
@@ -273,6 +285,7 @@ export default function ScriptPane({
       await load(true)
       setEditName(name)
       setEditContent(DEFAULT_TEMPLATE(stem))
+      setEditView('edit')
       setEditOpen(true)
     } catch (e) {
       const info = describeError(e)
@@ -435,23 +448,26 @@ export default function ScriptPane({
         </div>
       )}
 
-      <Drawer
+      <Modal
         title={paramOpen ? `参数 · ${paramOpen.display_name || paramOpen.name}` : '参数'}
         open={!!paramOpen}
-        onClose={() => setParamOpen(null)}
-        width={400}
-        destroyOnClose
-        extra={
-          <Button
-            type="primary"
-            loading={!!runningName}
-            onClick={() => {
-              if (!paramOpen) return
-              void doRun(paramOpen, paramValues).then(() => setParamOpen(null))
-            }}
-          >
-            保存参数并执行
-          </Button>
+        onCancel={() => setParamOpen(null)}
+        width={480}
+        destroyOnHidden
+        footer={
+          <Space>
+            <Button onClick={() => setParamOpen(null)}>取消</Button>
+            <Button
+              type="primary"
+              loading={!!runningName}
+              onClick={() => {
+                if (!paramOpen) return
+                void doRun(paramOpen, paramValues).then(() => setParamOpen(null))
+              }}
+            >
+              保存参数并执行
+            </Button>
+          </Space>
         }
       >
         {(paramOpen?.params || []).length === 0 ? (
@@ -459,34 +475,78 @@ export default function ScriptPane({
         ) : (
           <Form layout="vertical">{paramForm}</Form>
         )}
-      </Drawer>
+      </Modal>
 
-      <Drawer
-        title={`编辑 · ${editName}`}
+      <Modal
+        title={
+          <Space size={8} wrap>
+            <CodeOutlined style={{ color: 'var(--primary)' }} />
+            <span>编辑 · {editName}</span>
+          </Space>
+        }
         open={editOpen}
-        onClose={() => setEditOpen(false)}
-        width={560}
-        destroyOnClose
-        extra={
-          <Button type="primary" loading={editSaving} onClick={() => void saveEdit()}>
-            保存
-          </Button>
+        onCancel={() => setEditOpen(false)}
+        width="92vw"
+        style={{ top: 24, maxWidth: '92vw', paddingBottom: 0 }}
+        wrapClassName="script-edit-modal"
+        destroyOnHidden
+        footer={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-4)' }}>
+              {editView === 'edit' ? 'Ctrl / ⌘ + S 保存' : '切换到「源码」可编辑'}
+            </span>
+            <Space>
+              <Button onClick={() => setEditOpen(false)}>关闭</Button>
+              <Button type="primary" loading={editSaving} disabled={editView === 'preview'} onClick={() => void saveEdit()}>
+                保存
+              </Button>
+            </Space>
+          </div>
         }
       >
-        <Input.TextArea
-          value={editContent}
-          onChange={(e) => setEditContent(e.target.value)}
-          autoSize={{ minRows: 18, maxRows: 36 }}
-          style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}
-        />
-      </Drawer>
+        <div className="script-edit-stage">
+          <div style={{ marginBottom: 10 }}>
+            <Segmented
+              size="small"
+              value={editView}
+              onChange={(v) => setEditView(v as 'preview' | 'edit')}
+              options={[
+                { label: '语法高亮', value: 'preview' },
+                { label: '源码', value: 'edit' },
+              ]}
+            />
+          </div>
+          {editView === 'preview' ? (
+            <div className="script-edit-preview">
+              <CodeView code={editContent} ext={extOf(editName)} />
+            </div>
+          ) : (
+            <Input.TextArea
+              value={editContent}
+              spellCheck={false}
+              onChange={(e) => setEditContent(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                  e.preventDefault()
+                  void saveEdit()
+                }
+              }}
+              className="script-edit-source"
+              style={{ fontFamily: MONO, fontSize: 12.5, lineHeight: 1.6 }}
+            />
+          )}
+        </div>
+      </Modal>
 
-      <Drawer
-        title={`日志 · ${logsName}`}
+      <Modal
+        title={`执行日志 · ${logsName}`}
         open={logsOpen}
-        onClose={() => setLogsOpen(false)}
-        width={560}
-        destroyOnClose
+        onCancel={() => setLogsOpen(false)}
+        width={780}
+        destroyOnHidden
+        footer={
+          <Button onClick={() => setLogsOpen(false)}>关闭</Button>
+        }
       >
         {logsLoading ? (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="加载中…" />
@@ -523,7 +583,7 @@ export default function ScriptPane({
             )}
           </div>
         )}
-      </Drawer>
+      </Modal>
 
       <Modal
         title="新建脚本"
