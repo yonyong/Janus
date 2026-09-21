@@ -1099,8 +1099,99 @@ body.wb-dragging .wb-split::after {
   font-size: var(--fs-sm);
   line-height: 1.8;
   color: var(--text-1);
-  white-space: pre-wrap;
+  padding: 4px 2px;
 }
+
+/* 需求 / 详细设计文档预览（与 .fv-md 同级文档排版，无弹层高度限制） */
+.doc-md {
+  color: var(--text-1);
+  font-size: var(--fs-md);
+  line-height: 1.75;
+  word-break: break-word;
+}
+
+.doc-md > :first-child {
+  margin-top: 0;
+}
+
+.doc-md > :last-child {
+  margin-bottom: 0;
+}
+
+.doc-md h1,
+.doc-md h2,
+.doc-md h3,
+.doc-md h4 {
+  color: var(--text-1);
+  margin: 18px 0 10px;
+  line-height: 1.4;
+}
+
+.doc-md h1 { font-size: 20px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.doc-md h2 { font-size: 17px; }
+.doc-md h3 { font-size: 15px; }
+.doc-md h4 { font-size: 14px; }
+
+.doc-md p { margin: 8px 0; }
+
+.doc-md a { color: var(--primary); }
+
+.doc-md ul,
+.doc-md ol { padding-left: 22px; margin: 8px 0; }
+
+.doc-md li { margin: 2px 0; }
+
+.doc-md blockquote {
+  margin: 10px 0;
+  padding: 6px 14px;
+  border-left: 3px solid var(--brand-a);
+  background: var(--bg-hover);
+  color: var(--text-2);
+  border-radius: 0 6px 6px 0;
+}
+
+.doc-md code {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.doc-md pre {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow: auto;
+  margin: 8px 0;
+}
+
+.doc-md pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.doc-md table {
+  border-collapse: collapse;
+  margin: 10px 0;
+  font-size: var(--fs-xs);
+  width: 100%;
+}
+
+.doc-md th,
+.doc-md td {
+  border: 1px solid var(--border);
+  padding: 5px 12px;
+}
+
+.doc-md th { background: var(--bg-soft); font-weight: 600; }
+
+.doc-md img { max-width: 100%; border-radius: 6px; }
+
+.doc-md hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
 .doc-polish-loading {
   flex: none;
@@ -2588,6 +2679,120 @@ body.wb-dragging .wb-split::after {
   margin-top: 6px;
   font-size: var(--fs-xs);
   color: var(--text-4);
+}
+
+/* Agent 答复底部：本轮耗时 / Token；超阈值红色警示 */
+.msg-run-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-size: var(--fs-xs);
+  color: var(--text-4);
+  line-height: 1.4;
+}
+
+.msg-run-meta.is-warn {
+  color: #cf1322;
+  border-top-color: rgba(207, 19, 34, 0.35);
+}
+
+.msg-run-meta-icon {
+  font-size: 12px;
+}
+
+.msg-run-meta-tip {
+  opacity: 0.9;
+}
+
+.msg-run-meta-tip::before {
+  content: '·';
+  margin-right: 6px;
+  opacity: 0.6;
+}
+
+/* 长会话轻提示：贴在输入框上方，不挡消息列表 */
+.chat-session-hint {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 16px 0;
+  background: var(--bg-elevated);
+}
+
+.chat-session-hint-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: 6px;
+  background: var(--tint-primary);
+  border: 1px solid var(--tint-primary-border);
+  color: var(--primary);
+  font-size: var(--fs-xs);
+}
+
+.chat-session-hint-text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  line-height: 1.45;
+}
+
+.chat-session-hint-action {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border: 1px solid var(--tint-primary-border);
+  border-radius: 6px;
+  background: var(--tint-primary);
+  color: var(--primary);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.chat-session-hint-action:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--primary);
+}
+
+.chat-session-hint-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.chat-session-hint-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-4);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.chat-session-hint-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-2);
 }
 
 @keyframes stream-caret-blink {
@@ -4568,15 +4773,19 @@ pre.diff {
 
 .script-logs {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-direction: row;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
 }
 
 .script-logs-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 160px;
+  flex: none;
+  width: 280px;
+  max-width: 36%;
   overflow: auto;
 }
 
@@ -4601,11 +4810,20 @@ pre.diff {
 .script-log-item .is-ok { color: var(--success-strong); }
 .script-log-item .is-bad { color: #d4380d; }
 
+.script-log-detail {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .script-log-meta {
   font-size: 11px;
   color: var(--text-4);
   margin-bottom: 6px;
   word-break: break-all;
+  flex: none;
 }
 
 .script-log-out {
@@ -4616,8 +4834,25 @@ pre.diff {
   font-size: 12px;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 420px;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
   overflow: auto;
+}
+
+/* 脚本执行日志：与编辑弹窗同规格的接近全屏模态 */
+.script-logs-modal .ant-modal-container {
+  height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+.script-logs-modal .ant-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 脚本编辑：接近全屏的模态框 + 源码/语法高亮切换 */
