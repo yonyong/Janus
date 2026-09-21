@@ -35,7 +35,6 @@ import {
   listRequirements,
   requirementWorkflow,
   Requirement,
-  ReqMode,
   Stage,
   STAGE_LABELS,
   WorkflowState,
@@ -77,8 +76,6 @@ export default function RequirementList() {
   const [projectPath, setProjectPath] = useState('')
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
-  // 创建需求时的工作流模式：full 标准四阶段 / lite 轻量（跳过澄清与用例直接编码）
-  const [createMode, setCreateMode] = useState<ReqMode>('full')
   const [busyId, setBusyId] = useState<number | null>(null)
   // 「从已有会话进入」选择器：进入有历史会话的需求时先问一下怎么进
   const [pickOpen, setPickOpen] = useState(false)
@@ -355,59 +352,8 @@ export default function RequirementList() {
           >
             <Input placeholder="例如：新增登录验证码校验" />
           </Form.Item>
-          <Form.Item name="description" label="需求描述" extra="写得越具体，Agent 拆解与编码越准确">
+          <Form.Item name="description" label="需求描述" extra="写得越具体，Agent 拆解与编码越准确" style={{ marginBottom: 0 }}>
             <Input.TextArea rows={4} placeholder="补充背景、验收标准、影响范围…" />
-          </Form.Item>
-          <Form.Item label="工作流模式" style={{ marginBottom: 0 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {(
-                [
-                  {
-                    key: 'full' as ReqMode,
-                    title: '标准流程',
-                    tag: <Tag color="blue" style={{ marginInlineEnd: 0 }}>推荐</Tag>,
-                    desc: '澄清需求、配置用例后再编码，验收依据充分',
-                    flow: '澄清 → 用例 → 编码 → 归档',
-                  },
-                  {
-                    key: 'lite' as ReqMode,
-                    title: '轻量流程',
-                    tag: <Tag color="orange" style={{ marginInlineEnd: 0 }}>快速</Tag>,
-                    desc: '小改动直达编码，归档时以改动记录作为验收依据',
-                    flow: '（可选）澄清/用例 → 编码 → 归档',
-                  },
-                ] as const
-              ).map((m) => (
-                <div
-                  key={m.key}
-                  onClick={() => setCreateMode(m.key)}
-                  style={{
-                    border: `1.5px solid ${createMode === m.key ? '#3370ff' : '#e5e6eb'}`,
-                    background: createMode === m.key ? '#f0f5ff' : '#fff',
-                    borderRadius: 8,
-                    padding: '10px 12px',
-                    cursor: 'pointer',
-                    transition: 'all .2s',
-                  }}
-                >
-                  <Space size={6} style={{ marginBottom: 4 }}>
-                    <Typography.Text strong style={{ fontSize: 13 }}>
-                      {m.title}
-                    </Typography.Text>
-                    {m.tag}
-                  </Space>
-                  <Typography.Paragraph
-                    type="secondary"
-                    style={{ fontSize: 12, lineHeight: 1.6, marginBottom: 6 }}
-                  >
-                    {m.desc}
-                  </Typography.Paragraph>
-                  <Typography.Text type="secondary" style={{ fontSize: 11 }} code>
-                    {m.flow}
-                  </Typography.Text>
-                </div>
-              ))}
-            </div>
           </Form.Item>
         </Form>
       </Modal>

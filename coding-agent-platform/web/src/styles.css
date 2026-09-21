@@ -3229,6 +3229,14 @@ pre.diff {
   background: var(--bg-page);
 }
 
+.doc-att-clickable {
+  cursor: pointer;
+}
+
+.doc-att-clickable:hover {
+  background: var(--primary-soft, #eef3ff);
+}
+
 .doc-att-icon {
   color: var(--text-4);
 }
@@ -3259,6 +3267,15 @@ pre.diff {
   font-size: var(--fs-xs);
   color: var(--text-2);
   max-width: 240px;
+}
+
+.case-att-clickable {
+  cursor: pointer;
+}
+
+.case-att-clickable:hover {
+  background: var(--primary-soft, #eef3ff);
+  border-color: var(--primary, #3370ff);
 }
 
 .case-att-name {

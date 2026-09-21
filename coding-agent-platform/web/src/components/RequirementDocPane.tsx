@@ -4,6 +4,7 @@ import {
   Alert,
   Button,
   Input,
+  Modal,
   Popconfirm,
   Segmented,
   Space,
@@ -34,8 +35,10 @@ import {
   updateRequirement,
   uploadRequirementAttachments,
 } from '../api'
+import { extOf } from '../chatAttachments'
 import RichText from './RichText'
 import VersionHistoryDrawer from './VersionHistoryDrawer'
+import FilePreview, { previewKindOf, hasPreviewMode } from './FileViewer'
 
 const DOC_TEMPLATE = `## 背景
 
@@ -92,6 +95,7 @@ export default function RequirementDocPane({
   const [historyOpen, setHistoryOpen] = useState(false)
   const [atts, setAtts] = useState<Attachment[]>([])
   const [attsLoading, setAttsLoading] = useState(false)
+  const [preview, setPreview] = useState<{ path: string; ext: string; content: string; name: string } | null>(null)
 
   useEffect(() => {
     const t = requirement?.title || ''
@@ -128,6 +132,26 @@ export default function RequirementDocPane({
   const activeDoc = tab === 'original' ? doc : design
   const setActiveDoc = (v: string) => (tab === 'original' ? setDoc(v) : setDesign(v))
   const chars = activeDoc.trim().length
+
+  const openAttPreview = async (a: Attachment) => {
+    if (pid == null) {
+      message.warning('无法预览：缺少项目上下文')
+      return
+    }
+    const ext = extOf(a.filename)
+    const kind = previewKindOf(ext)
+    const binaryPreview =
+      kind === 'pdf' || kind === 'image' || kind === 'sheet' || kind === 'docx' || kind === 'office-legacy'
+    let content = ''
+    if (!binaryPreview) {
+      try {
+        content = (await readFile(token, pid, a.path)).content
+      } catch {
+        /* 读不到内容时仍打开预览 */
+      }
+    }
+    setPreview({ path: a.path, ext, content, name: a.filename })
+  }
 
   const save = async () => {
     if (!requirement || saving) return
@@ -441,7 +465,20 @@ export default function RequirementDocPane({
         ) : (
           <div className="doc-att-list">
             {atts.map((a) => (
-              <div className="doc-att" key={a.id} title={a.path}>
+              <div
+                className="doc-att doc-att-clickable"
+                key={a.id}
+                title={pid == null ? a.path : `点击预览 · ${a.path}`}
+                onClick={() => void openAttPreview(a)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    void openAttPreview(a)
+                  }
+                }}
+              >
                 <PaperClipOutlined className="doc-att-icon" />
                 <span className="doc-att-name">{a.filename}</span>
                 <Tag style={{ marginInlineEnd: 0 }} color="default">{fmtSize(a.size)}</Tag>
@@ -452,13 +489,40 @@ export default function RequirementDocPane({
                   cancelText="取消"
                   onConfirm={() => void removeAtt(a)}
                 >
-                  <Button size="small" type="text" danger icon={<DeleteOutlined />} />
+                  <Button
+                    size="small"
+                    type="text"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={(e) => e.stopPropagation()}
+                  />
                 </Popconfirm>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <Modal
+        title={preview?.name}
+        open={!!preview}
+        onCancel={() => setPreview(null)}
+        footer={<a onClick={() => setPreview(null)}>关闭</a>}
+        width={860}
+        destroyOnHidden
+      >
+        {preview && pid != null && (
+          <div className="fv-stage">
+            {hasPreviewMode(preview.ext) ? (
+              <FilePreview pid={pid} token={token ?? null} path={preview.path} ext={preview.ext} content={preview.content} />
+            ) : (
+              <pre className="code-block" style={{ maxHeight: '58vh' }}>
+                {preview.content || '（空文件或内容不可预览）'}
+              </pre>
+            )}
+          </div>
+        )}
+      </Modal>
 
       <VersionHistoryDrawer
         token={token}
