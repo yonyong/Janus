@@ -508,15 +508,24 @@ export default function RequirementDocPane({
         open={!!preview}
         onCancel={() => setPreview(null)}
         footer={<a onClick={() => setPreview(null)}>关闭</a>}
-        width={860}
+        width="100vw"
+        style={{ top: 0, maxWidth: '100vw', paddingBottom: 0 }}
+        wrapClassName="fv-modal-fullscreen"
         destroyOnHidden
       >
         {preview && pid != null && (
-          <div className="fv-stage">
+          <div className="fv-stage fv-stage-full">
             {hasPreviewMode(preview.ext) ? (
-              <FilePreview pid={pid} token={token ?? null} path={preview.path} ext={preview.ext} content={preview.content} />
+              <FilePreview
+                pid={pid}
+                token={token ?? null}
+                path={preview.path}
+                ext={preview.ext}
+                content={preview.content}
+                fullscreen
+              />
             ) : (
-              <pre className="code-block" style={{ maxHeight: '58vh' }}>
+              <pre className="code-block" style={{ maxHeight: 'calc(100vh - 200px)' }}>
                 {preview.content || '（空文件或内容不可预览）'}
               </pre>
             )}
