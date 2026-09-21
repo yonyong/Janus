@@ -42,7 +42,7 @@ const PAGE_SIZE = 9
 
 export default function ProjectList() {
   const token = useToken()
-  const { authorized } = useAuth()
+  const { authorized, isAdmin } = useAuth()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const { kw } = useSearch()
@@ -51,7 +51,7 @@ export default function ProjectList() {
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'card' | 'table'>('card')
   const [page, setPage] = useState(1)
-  const [createOpen, setCreateOpen] = useState(params.get('new') === '1')
+  const [createOpen, setCreateOpen] = useState(false)
   const [shareTarget, setShareTarget] = useState<Project | null>(null)
   const [shareLink, setShareLink] = useState('')
   const [form] = Form.useForm()
@@ -79,13 +79,13 @@ export default function ProjectList() {
   }, [token, authorized])
 
   useEffect(() => {
-    if (params.get('new') === '1') {
+    if (isAdmin && params.get('new') === '1') {
       setCreateOpen(true)
       params.delete('new')
       setParams(params, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [isAdmin])
 
   const visible = useMemo(() => {
     const k = kw.trim().toLowerCase()
@@ -157,28 +157,32 @@ export default function ProjectList() {
     },
     {
       title: '操作',
-      width: 220,
+      width: isAdmin ? 220 : 100,
       render: (_: any, r: Project) => (
         <Space size={4}>
           <Button type="link" size="small" onClick={() => navigate(`/projects/${r.id}`)}>
             需求
           </Button>
-          <Button type="link" size="small" icon={<LinkOutlined />} onClick={() => genLink(r)}>
-            分享
-          </Button>
-          <Popconfirm
-            title="删除该项目？"
-            okText="删除"
-            cancelText="取消"
-            okButtonProps={{ danger: true }}
-            onConfirm={async () => {
-              await deleteProject(token, r.id)
-              message.success('已删除')
-              load()
-            }}
-          >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+          {isAdmin && (
+            <>
+              <Button type="link" size="small" icon={<LinkOutlined />} onClick={() => genLink(r)}>
+                分享
+              </Button>
+              <Popconfirm
+                title="删除该项目？"
+                okText="删除"
+                cancelText="取消"
+                okButtonProps={{ danger: true }}
+                onConfirm={async () => {
+                  await deleteProject(token, r.id)
+                  message.success('已删除')
+                  load()
+                }}
+              >
+                <Button type="link" size="small" danger icon={<DeleteOutlined />} />
+              </Popconfirm>
+            </>
+          )}
         </Space>
       ),
     },
@@ -196,7 +200,7 @@ export default function ProjectList() {
               <Tag color="blue">{projects.length}</Tag>
             </Space>
             <div style={{ color: '#8f959e', fontSize: 13, marginTop: 4 }}>
-              挂载本地工程目录，签发分享链接授权业务人员访问
+              {isAdmin ? '挂载本地工程目录，签发分享链接授权业务人员访问' : '查看已被授权访问的工程与需求'}
             </div>
           </div>
           <Space>
@@ -208,9 +212,11 @@ export default function ProjectList() {
                 { value: 'table', icon: <UnorderedListOutlined /> },
               ]}
             />
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)} disabled={!authorized}>
-              新建项目
-            </Button>
+            {isAdmin && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)} disabled={!authorized}>
+                新建项目
+              </Button>
+            )}
           </Space>
         </div>
       </Card>
@@ -219,7 +225,7 @@ export default function ProjectList() {
         {!authorized ? (
           <Empty description="尚未登录，请在右上角账号入口用令牌或管理员口令登录" />
         ) : visible.length === 0 ? (
-          <Empty description={kw ? '没有匹配的项目' : '暂无项目，点击右上角「新建项目」开始'} />
+          <Empty description={kw ? '没有匹配的项目' : isAdmin ? '暂无项目，点击右上角「新建项目」开始' : '暂无已授权项目'} />
         ) : view === 'card' ? (
           <>
             <Row gutter={[16, 16]}>
@@ -228,12 +234,16 @@ export default function ProjectList() {
                   <ProjectCard
                     project={p}
                     onOpen={() => navigate(`/projects/${p.id}`)}
-                    onShare={() => genLink(p)}
-                    onDelete={async () => {
-                      await deleteProject(token, p.id)
-                      message.success('已删除')
-                      load()
-                    }}
+                    onShare={isAdmin ? () => genLink(p) : undefined}
+                    onDelete={
+                      isAdmin
+                        ? async () => {
+                            await deleteProject(token, p.id)
+                            message.success('已删除')
+                            load()
+                          }
+                        : undefined
+                    }
                   />
                 </Col>
               ))}
