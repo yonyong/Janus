@@ -87,7 +87,7 @@ def test_admin_verify_checks_password():
 
 
 def test_create_requirement_route_requires_admin():
-    """新建需求仅管理员可调用：与新建项目同一套 require_admin 守卫。
+    """新建 / 删除需求仅管理员可调用：与新建项目同一套 require_admin 守卫。
 
     路由函数直接调用会绕过 FastAPI 依赖注入，因此检查路由表本身。
     """
@@ -98,4 +98,5 @@ def test_create_requirement_route_requires_admin():
         raise AssertionError(f"未找到路由 {method} {path}")
 
     assert A.require_admin in deps_of("/api/projects/{pid}/requirements", "POST")
+    assert A.require_admin in deps_of("/api/requirements/{rid}", "DELETE")
     assert A.require_admin in deps_of("/api/projects", "POST")
