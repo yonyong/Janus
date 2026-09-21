@@ -6,5 +6,8 @@ export default defineConfig({
   base: './',
   plugins: [react()],
   build: { outDir: 'dist' },
-  server: { proxy: { '/api': 'http://localhost:8000' } },
+  server: {
+    host: true, // 监听 0.0.0.0，允许通过局域网 IP 访问
+    proxy: { '/api': 'http://localhost:8000' },
+  },
 })
