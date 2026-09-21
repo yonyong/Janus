@@ -4553,15 +4553,19 @@ pre.diff {
 
 .script-logs {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-direction: row;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
 }
 
 .script-logs-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 160px;
+  flex: none;
+  width: 280px;
+  max-width: 36%;
   overflow: auto;
 }
 
@@ -4586,11 +4590,20 @@ pre.diff {
 .script-log-item .is-ok { color: var(--success-strong); }
 .script-log-item .is-bad { color: #d4380d; }
 
+.script-log-detail {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .script-log-meta {
   font-size: 11px;
   color: var(--text-4);
   margin-bottom: 6px;
   word-break: break-all;
+  flex: none;
 }
 
 .script-log-out {
@@ -4601,8 +4614,25 @@ pre.diff {
   font-size: 12px;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 420px;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
   overflow: auto;
+}
+
+/* 脚本执行日志：与编辑弹窗同规格的接近全屏模态 */
+.script-logs-modal .ant-modal-container {
+  height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+.script-logs-modal .ant-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 脚本编辑：接近全屏的模态框 + 源码/语法高亮切换 */
