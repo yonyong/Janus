@@ -228,7 +228,7 @@ try {
   console.log('1) 未登录打开页面')
   await waitFor(`!!document.querySelector('.ant-modal')`, '登录弹框自动弹出')
   expect(
-    (await evaluate(`document.querySelector('.ant-modal-title')?.textContent || ''`)).includes('登录'),
+    (await evaluate(`document.querySelector('.auth-panel-title')?.textContent || ''`)).includes('登录'),
     '弹框标题是登录',
   )
   expect(
@@ -289,7 +289,7 @@ try {
   await sleep(1500)
   await waitFor(`!!document.querySelector('.hero')`, '刷新后仍是登录态（凭证已落盘）')
   expect(
-    (await evaluate(`!!document.querySelector('.ant-modal-title')`)) === false,
+    (await evaluate(`!!document.querySelector('.auth-panel-title')`)) === false,
     '刷新后不再弹登录框',
   )
   await shot('auth-4-reloaded.png')
@@ -355,7 +355,7 @@ try {
     await goto(`${BASE}/?token=${shareToken}`)
     await waitFor(`!!document.querySelector('.hero')`, '分享链接直接进入工作台', 12000)
     expect(
-      (await evaluate(`!!document.querySelector('.ant-modal-title')`)) === false,
+      (await evaluate(`!!document.querySelector('.auth-panel-title')`)) === false,
       '分享链接不弹登录框',
     )
     // 令牌应已被搬到 localStorage 并从地址栏抹掉，避免长期外泄在 URL / 浏览器历史里

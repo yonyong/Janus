@@ -330,16 +330,44 @@ def _first_icon() -> Path | None:
     return None
 
 
+class DesktopApi:
+    """暴露给前端 React 调用的原生能力（pywebview js_api）。
+
+    当前仅 select_folder：弹出系统文件夹选择框，返回选中目录的绝对路径；
+    用户取消则返回空字符串。前端在「新建/编辑项目」的本地工程路径处调用。
+    """
+
+    def __init__(self) -> None:
+        self._window = None
+
+    def _set_window(self, window) -> None:
+        self._window = window
+
+    def select_folder(self) -> str:
+        import webview
+
+        window = self._window or (webview.windows[0] if webview.windows else None)
+        if window is None:
+            return ""
+        result = window.create_file_dialog(webview.FOLDER_DIALOG)
+        if result:
+            return str(result[0])
+        return ""
+
+
 def _open_window(url: str) -> None:
     import webview
 
-    webview.create_window(
+    api = DesktopApi()
+    window = webview.create_window(
         WINDOW_TITLE,
         url,
         width=1440,
         height=920,
         min_size=(1024, 700),
+        js_api=api,
     )
+    api._set_window(window)
     icon = _first_icon()
     # pywebview 的 icon 参数只在 GTK/QT 生效；Windows 的窗口图标由 exe 自带图标继承
     if os.name != "nt" and icon is not None:

@@ -63,6 +63,7 @@ import {
   describeError,
   setAdminToken,
 } from '../api'
+import FolderPathInput from '../components/FolderPathInput'
 
 /** 有效期预设：N 天 / 指定日期时刻 / 永不过期。 */
 const TTL_PRESETS = [
@@ -994,7 +995,7 @@ export default function AdminConsole() {
             rules={[{ required: true, message: '请输入本地磁盘绝对路径' }]}
             extra="路径必须已存在于后端运行的本机"
           >
-            <Input placeholder="D:/dev/my-project" />
+            <FolderPathInput placeholder="D:/dev/my-project" />
           </Form.Item>
         </Form>
       </Modal>
@@ -1018,7 +1019,7 @@ export default function AdminConsole() {
             rules={[{ required: true, message: '请输入本地磁盘绝对路径' }]}
             extra="保存后立即生效：该项目的文件面板、代码 diff 与会话工作目录都会指向新路径"
           >
-            <Input placeholder="D:/dev/my-project" />
+            <FolderPathInput placeholder="D:/dev/my-project" />
           </Form.Item>
         </Form>
       </Modal>

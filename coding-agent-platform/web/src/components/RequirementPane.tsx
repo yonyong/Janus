@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState } from 'react'
-import { Avatar, Empty, Modal, Select, Space, Spin, Typography } from 'antd'
+import { Avatar, Empty, Modal, Space, Spin, Typography } from 'antd'
 import {
   ArrowRightOutlined,
   BulbOutlined,
@@ -288,28 +288,6 @@ const RequirementPane = forwardRef<
         </div>
       )}
 
-      {agents.length > 1 && onChangeAgent && (
-        <div className="chat-agent-bar">
-          <span className="chat-agent-bar-label">
-            <RobotOutlined /> 使用 Agent
-          </span>
-          <Select
-            size="small"
-            style={{ minWidth: 180, flex: 1, maxWidth: 320 }}
-            value={agentId ?? undefined}
-            disabled={busy || agentSwitching}
-            loading={agentSwitching}
-            placeholder="选择 Agent"
-            options={agents.map((a) => ({
-              value: a.id,
-              label: a.available === false ? `${a.name}（今日限额已满）` : a.name,
-              disabled: a.available === false && a.id !== agentId,
-            }))}
-            onChange={(v) => onChangeAgent(Number(v))}
-          />
-        </div>
-      )}
-
       {showSessionHint && (
         <div className="chat-session-hint" role="status">
           <span className="chat-session-hint-icon" aria-hidden>
@@ -346,6 +324,10 @@ const RequirementPane = forwardRef<
         onUpload={uploadFiles}
         onAbort={onAbort}
         aborting={aborting}
+        agents={agents}
+        agentId={agentId}
+        onChangeAgent={onChangeAgent}
+        agentSwitching={agentSwitching}
       />
 
       <Modal

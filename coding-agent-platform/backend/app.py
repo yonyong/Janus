@@ -2204,6 +2204,56 @@ def admin_overview(db: sqlite3.Connection = Depends(get_db), _ok=Depends(require
     }
 
 
+def _drive_roots() -> list[str]:
+    """本机可用盘符（Windows）或根目录（类 Unix），统一用正斜杠。"""
+    if os.name != "nt":
+        return ["/"]
+    out = []
+    for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+        if os.path.isdir(f"{letter}:\\"):
+            out.append(f"{letter}:/")
+    return out
+
+
+@app.get("/api/admin/fs/dirs")
+def admin_list_dirs(path: str = Query(""), _ok=Depends(require_admin)):
+    """列出本机目录，供网页版「本地工程路径」的目录选择器使用。
+
+    只返回目录项、不读取任何文件内容；需要管理员口令。
+
+    - 不传 path：返回盘符列表（Windows）或根目录（类 Unix）
+    - 传 path：返回该目录下的子目录与上级目录；路径不存在报 400，无权限报 403
+    """
+    def _norm(p: str) -> str:
+        return os.path.abspath(p).replace("\\", "/")
+
+    if not path.strip():
+        return {"path": "", "parent": "", "dirs": [], "roots": _drive_roots()}
+
+    target = path.strip()
+    if not os.path.isdir(target):
+        raise HTTPException(status_code=400, detail=f"目录不存在: {target}")
+
+    norm = _norm(target)
+    dirs: list[dict] = []
+    try:
+        with os.scandir(norm) as it:
+            for entry in it:
+                try:
+                    if entry.is_dir():
+                        dirs.append({"name": entry.name, "path": _norm(entry.path)})
+                except OSError:
+                    continue
+    except PermissionError:
+        raise HTTPException(status_code=403, detail=f"无权限访问: {target}")
+    dirs.sort(key=lambda d: d["name"].lower())
+
+    parent = os.path.dirname(norm)
+    if parent.rstrip("/") == norm.rstrip("/"):  # 已在盘符/根目录，无更上级
+        parent = ""
+    return {"path": norm, "parent": parent, "dirs": dirs, "roots": _drive_roots()}
+
+
 @app.get("/api/admin/projects")
 def admin_projects(db: sqlite3.Connection = Depends(get_db), _ok=Depends(require_admin)):
     out = []

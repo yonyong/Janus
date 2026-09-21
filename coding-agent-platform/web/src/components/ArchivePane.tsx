@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { App as AntdApp, Alert, Button, Empty, Input, Space, Tag, Typography } from 'antd'
+import { App as AntdApp, Button, Empty, Input, Space, Tag, Typography } from 'antd'
 import {
   CheckCircleFilled,
   CloseCircleFilled,
   ExclamationCircleFilled,
+  FileSearchOutlined,
   InboxOutlined,
   MinusCircleOutlined,
 } from '@ant-design/icons'
@@ -101,33 +102,42 @@ export default function ArchivePane({
   return (
     <div className="archive-pane">
       {archived && (
-        <Alert
-          type={flow.verdict === 'accepted' ? 'success' : 'warning'}
-          showIcon
-          style={{ margin: '0 10px 8px' }}
-          message={
-            flow.verdict === 'accepted'
-              ? `已于 ${String(flow.archived_at).replace('T', ' ')} 标记完成`
-              : `已于 ${String(flow.archived_at).replace('T', ' ')} 记录打回`
-          }
-          description={flow.verdict_note ? <RichText text={flow.verdict_note} /> : undefined}
-        />
+        <div className="arc-banner">
+          <div className={`arc-notice ${flow.verdict === 'accepted' ? 'arc-notice-ok' : 'arc-notice-warn'}`}>
+            <span className="arc-notice-icon">
+              {flow.verdict === 'accepted' ? <CheckCircleFilled /> : <ExclamationCircleFilled />}
+            </span>
+            <div className="arc-notice-main">
+              <div className="arc-notice-title">
+                {flow.verdict === 'accepted' ? '需求已完成' : '已记录打回'}
+                <span className="arc-notice-time">{String(flow.archived_at).replace('T', ' ')}</span>
+              </div>
+              {flow.verdict_note && (
+                <div className="arc-notice-desc">
+                  <RichText text={flow.verdict_note} />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="arc-scroll">
         {/* 弱提示不阻断：没配用例也能归档，但要把「验收依据是什么」说清楚 */}
         {!archived && total === 0 && (
-          <Alert
-            type="warning"
-            showIcon
-            style={{ margin: '0 10px 8px' }}
-            message={
-              flow.requirement?.mode === 'lite'
-                ? '轻量流程：本需求未配置用例，验收依据以改动记录与对话结论为准'
-                : '本需求未配置用例，验收依据以改动记录与对话结论为准'
-            }
-            description='仍可直接标记完成；如需用例佐证，可到「用例配置」补配后再归档。'
-          />
+          <div className="arc-notice arc-notice-warn">
+            <span className="arc-notice-icon">
+              <ExclamationCircleFilled />
+            </span>
+            <div className="arc-notice-main">
+              <div className="arc-notice-title">
+                {flow.requirement?.mode === 'lite' ? '轻量流程 · 未配置用例' : '本需求未配置用例'}
+              </div>
+              <div className="arc-notice-desc">
+                验收依据以改动记录与对话结论为准；仍可直接标记完成，如需用例佐证，可到「用例配置」补配后再归档。
+              </div>
+            </div>
+          </div>
         )}
         <div className="arc-card">
           <div className="arc-card-head">
@@ -135,26 +145,29 @@ export default function ArchivePane({
               <span className="arc-head-title">测试报告</span>
               <span className="arc-head-sub">
                 {total === 0
-                  ? '还没有可执行的用例'
+                  ? '未配置用例'
                   : blocking === 0
                     ? `${total} 条用例全部通过 ✨`
                     : `${stats?.passed ?? 0} / ${total} 条通过`}
               </span>
             </Space>
-            <Space size={4} wrap>
-              <Tag color="green" style={{ marginInlineEnd: 0 }}>
-                通过 {stats?.passed ?? 0}
-              </Tag>
-              <Tag color={(stats?.failed ?? 0) > 0 ? 'red' : 'default'} style={{ marginInlineEnd: 0 }}>
-                失败 {stats?.failed ?? 0}
-              </Tag>
-              <Tag style={{ marginInlineEnd: 0 }}>未跑 {(stats?.pending ?? 0) + (stats?.skipped ?? 0)}</Tag>
-              {(stats?.manual_pending ?? 0) > 0 && (
-                <Tag color="blue" style={{ marginInlineEnd: 0 }}>
-                  人工待核 {stats?.manual_pending}
+            {/* 没配用例时没有统计可言，标签整行不渲染，别用 0/0/0 占位 */}
+            {total > 0 ? (
+              <Space size={4} wrap>
+                <Tag color="green" style={{ marginInlineEnd: 0 }}>
+                  通过 {stats?.passed ?? 0}
                 </Tag>
-              )}
-            </Space>
+                <Tag color={(stats?.failed ?? 0) > 0 ? 'red' : 'default'} style={{ marginInlineEnd: 0 }}>
+                  失败 {stats?.failed ?? 0}
+                </Tag>
+                <Tag style={{ marginInlineEnd: 0 }}>未跑 {(stats?.pending ?? 0) + (stats?.skipped ?? 0)}</Tag>
+                {(stats?.manual_pending ?? 0) > 0 && (
+                  <Tag color="blue" style={{ marginInlineEnd: 0 }}>
+                    人工待核 {stats?.manual_pending}
+                  </Tag>
+                )}
+              </Space>
+            ) : null}
           </div>
 
           {total > 0 && (
@@ -173,9 +186,13 @@ export default function ArchivePane({
 
           <div className="arc-card-body">
             {cases.length === 0 ? (
-              <Typography.Text type="secondary">
-                这个需求还没有配置用例。回到「用例配置」配好后，编码 Agent 执行的结果会汇总到这里。
-              </Typography.Text>
+              <div className="arc-empty">
+                <FileSearchOutlined className="arc-empty-icon" />
+                <div className="arc-empty-title">这个需求还没有配置用例</div>
+                <div className="arc-empty-desc">
+                  回到「用例配置」配好后，编码 Agent 执行的结果会汇总到这里。
+                </div>
+              </div>
             ) : (
               <div className="arc-cases">
                 {cases.map((c, i) => (

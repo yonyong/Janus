@@ -49,7 +49,10 @@
   --tint-primary: #eef4ff;
   --tint-primary-border: #d4e2ff;
   --tint-success: #e8f7ec;
+  --tint-success-border: #cdeed7;
   --tint-danger: #fdecec;
+  --tint-warning: #fff8ec;
+  --tint-warning-border: #ffe2bd;
   --diff-add-bg: #eafbef;
   --diff-del-bg: #fdecec;
   --shadow-sm: 0 1px 3px rgba(31, 35, 41, 0.06);
@@ -92,7 +95,10 @@
   --tint-primary: #e3efe6;
   --tint-primary-border: #cfe4d3;
   --tint-success: #e3efe0;
+  --tint-success-border: #cfe0c6;
   --tint-danger: #f6e3df;
+  --tint-warning: #f8efd9;
+  --tint-warning-border: #e3d0a4;
   --diff-add-bg: #e3efdc;
   --diff-del-bg: #f4e2dc;
   --shadow-sm: 0 1px 3px rgba(90, 74, 40, 0.08);
@@ -138,7 +144,10 @@
   --tint-primary: #1f2b45;
   --tint-primary-border: #2f4066;
   --tint-success: #16301f;
+  --tint-success-border: #23512f;
   --tint-danger: #3a1f1e;
+  --tint-warning: #3a2c14;
+  --tint-warning-border: #57431f;
   --diff-add-bg: #12351f;
   --diff-del-bg: #3d1f1e;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
@@ -181,7 +190,10 @@
   --tint-primary: #1e2c4d;
   --tint-primary-border: #33456e;
   --tint-success: #12321f;
+  --tint-success-border: #1d4a2c;
   --tint-danger: #3a1f20;
+  --tint-warning: #362914;
+  --tint-warning-border: #52401d;
   --diff-add-bg: #10331d;
   --diff-del-bg: #3d1f20;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.45);
@@ -1554,6 +1566,82 @@ body.wb-dragging .wb-split::after {
   background: var(--bg-elevated);
 }
 
+/* 提示条：与卡片同宽、同圆角、同字阶，取代原先的 antd Alert
+   （Alert 的图标列/描述缩进与卡片栅格对不齐，整块显得比卡片更宽、行距更散）。 */
+.arc-banner {
+  flex: none;
+  padding: 12px 16px 0;
+}
+
+.arc-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+}
+
+.arc-banner .arc-notice {
+  margin-bottom: 0;
+}
+
+.arc-notice-icon {
+  flex: none;
+  margin-top: 4px;
+  font-size: var(--fs-xs);
+}
+
+.arc-notice-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.arc-notice-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--text-1);
+}
+
+.arc-notice-time {
+  margin-left: 8px;
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--text-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.arc-notice-desc {
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  line-height: 1.65;
+  color: var(--text-3);
+}
+
+.arc-notice-desc .code-block {
+  margin: 6px 0 0;
+}
+
+.arc-notice-warn {
+  background: var(--tint-warning);
+  border-color: var(--tint-warning-border);
+}
+
+.arc-notice-warn .arc-notice-icon {
+  color: var(--warning-strong);
+}
+
+.arc-notice-ok {
+  background: var(--tint-success);
+  border-color: var(--tint-success-border);
+}
+
+.arc-notice-ok .arc-notice-icon {
+  color: var(--success);
+}
+
 .arc-scroll {
   flex: 1;
   min-height: 0;
@@ -1618,6 +1706,34 @@ body.wb-dragging .wb-split::after {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+/* 空态：没配用例时给一块安静的说明，而不是一行孤零零的灰字 */
+.arc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 26px 12px 24px;
+  text-align: center;
+}
+
+.arc-empty-icon {
+  margin-bottom: 4px;
+  font-size: 22px;
+  color: var(--text-4);
+  opacity: 0.75;
+}
+
+.arc-empty-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.arc-empty-desc {
+  font-size: var(--fs-xs);
+  color: var(--text-4);
 }
 
 .arc-case {
@@ -2089,128 +2205,206 @@ body.wb-dragging .wb-split::after {
 }
 
 /* ---------- 统一登录弹框 ---------- */
-/* 结构：品牌渐变头 + 白卡主体。头部渐变与首页 Hero、侧栏 Logo 同一套色，
-   主体只保留「模式切换 → 输入 → 提交」，原先的大段说明收进浅色提示条。 */
+/* 结构：左侧品牌渐变栏（常驻） + 右侧表单面板。
+   宽版 920 让「宽」有理由：左栏承载 Logo / 标语 / 能力要点，右栏表单保持紧凑定宽，
+   输入框与提交按钮同宽对齐。窄屏时左栏收成顶部品牌条，表单独占（见文末 880 断点）。 */
 
 .auth-modal .ant-modal-container {
   padding: 0;
   overflow: hidden;
-  border-radius: 16px;
-  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.24);
+  border-radius: 18px;
+  box-shadow: 0 28px 72px rgba(15, 23, 42, 0.26);
 }
 
-/* ---- 头部：整幅渐变 + 装饰光斑 ---- */
-.auth-head {
+.auth-split {
+  display: grid;
+  grid-template-columns: 392px minmax(0, 1fr);
+}
+
+/* ---- 左栏：品牌渐变 ---- */
+.auth-brand {
   position: relative;
   overflow: hidden;
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 22px 24px 20px;
+  flex-direction: column;
+  gap: 24px;
+  padding: 34px 30px 28px;
   color: #fff;
-  background: linear-gradient(120deg, var(--primary-deep) 0%, var(--brand-a) 52%, var(--brand-b) 108%);
+  background:
+    radial-gradient(120% 78% at 18% 0%, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 58%),
+    linear-gradient(150deg, var(--primary-deep) 0%, var(--brand-a) 54%, var(--brand-b) 106%);
 }
 
-.auth-head-orb {
+.auth-brand-orb {
   position: absolute;
   border-radius: 50%;
   pointer-events: none;
 }
 
-.auth-head-orb-a {
-  width: 190px;
-  height: 190px;
-  right: -56px;
-  top: -76px;
-  background: rgba(255, 255, 255, 0.13);
+.auth-brand-orb-a {
+  width: 240px;
+  height: 240px;
+  right: -92px;
+  top: -104px;
+  background: rgba(255, 255, 255, 0.14);
 }
 
-.auth-head-orb-b {
-  width: 132px;
-  height: 132px;
-  right: 76px;
-  bottom: -92px;
-  background: rgba(255, 255, 255, 0.08);
+.auth-brand-orb-b {
+  width: 176px;
+  height: 176px;
+  left: -76px;
+  bottom: -86px;
+  background: rgba(255, 255, 255, 0.09);
 }
 
-/* Logo 垫一层白底，避免渐变 Logo 直接压在渐变头上糊成一片 */
-.auth-head-mark {
+.auth-brand-top {
   position: relative;
-  flex: none;
   display: flex;
-  padding: 5px;
-  border-radius: 14px;
+  flex-direction: column;
+  /* Logo 与品牌信息在左栏水平居中（下方的要点清单仍保持左对齐） */
+  align-items: center;
+  gap: 13px;
+}
+
+/* Logo 垫一层白底，避免渐变 Logo 直接压在渐变底上糊成一片 */
+.auth-brand-mark {
+  display: flex;
+  padding: 7px;
+  border-radius: 16px;
   background: var(--bg-elevated);
-  box-shadow: 0 8px 20px rgba(10, 18, 50, 0.22);
+  box-shadow: 0 10px 24px rgba(10, 18, 50, 0.26);
 }
 
-.auth-head-text {
-  position: relative;
+.auth-brand-title {
   min-width: 0;
-  flex: 1;
+  text-align: center;
 }
 
-/* 标题与标语同一行：标题靠左，标语小字靠右 */
-.auth-head-title-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 14px;
-}
-
-.auth-head-title {
-  font-size: var(--fs-lg);
+.auth-brand-name {
+  font-size: 26px;
   font-weight: 700;
-  letter-spacing: 0.4px;
-  line-height: 1.35;
+  letter-spacing: 0.6px;
+  line-height: 1.25;
   color: #fff;
 }
 
-.auth-head-sub {
-  margin-top: 3px;
-  font-size: var(--fs-xs);
-  color: rgba(255, 255, 255, 0.8);
-  letter-spacing: 0.2px;
-}
-
-/* 未登录时头部品牌标语 —— 标题右侧品牌渐变胶囊标签 · 釉面艺术字 */
-.auth-head-slogan {
-  flex: none;
+.auth-brand-slogan {
+  margin-top: 4px;
   font-size: var(--fs-sm);
-  font-weight: 400;
-  letter-spacing: 0.8px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.auth-brand-points {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* 弹框被内容撑高时上下均分留白，避免要点与底部小字之间出现大片空档 */
+  margin: auto 0;
+  padding: 0;
+  list-style: none;
+}
+
+.auth-brand-point {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.auth-brand-point-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: var(--fs-sm);
   color: #fff;
-  padding: 6px 15px;
-  border-radius: 999px;
-  background: linear-gradient(120deg, var(--brand-a) 0%, var(--brand-b) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 6px 16px rgba(60, 90, 220, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  text-shadow: 0 1px 2px rgba(40, 60, 160, 0.55);
-  white-space: nowrap;
 }
 
-/* 品牌名：实色亮白斜体加粗，作清晰视觉焦点 */
-.auth-head-slogan-brand {
-  font-style: italic;
-  font-weight: 400;
-  margin-right: 1px;
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(20, 30, 90, 0.75);
+.auth-brand-point-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 
-/* 关闭按钮落在渐变头上，把 antd 默认的底色/悬停色换成白色系 */
+.auth-brand-point-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: #fff;
+}
+
+.auth-brand-point-desc {
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.auth-brand-foot {
+  position: relative;
+  margin-top: auto;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.4px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ---- 右栏：表单面板 ---- */
+.auth-panel {
+  display: flex;
+  align-items: center;
+  padding: 32px 38px;
+  background: var(--bg-elevated);
+}
+
+.auth-panel-inner {
+  width: 100%;
+}
+
+.auth-panel-head {
+  margin-bottom: 18px;
+}
+
+.auth-panel-title {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--text-1);
+}
+
+.auth-panel-sub {
+  margin-top: 5px;
+  font-size: var(--fs-xs);
+  color: var(--text-4);
+}
+
+/* 关闭按钮落在白色表单面板上，用浅色系而非原先的白字 */
 .auth-modal .ant-modal-close {
+  top: 14px;
+  inset-inline-end: 14px;
+  color: var(--text-4);
   border-radius: 8px;
 }
 
 .auth-modal .ant-modal-close:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.18);
+  color: var(--text-1);
+  background: var(--bg-hover);
 }
 
-/* ---- 主体 ---- */
-.auth-body {
-  padding: 20px 24px;
+/* 提示条：登录状态变化 / 后端未启用口令 */
+.auth-modal .auth-notice {
+  margin-bottom: 16px;
+  border-radius: 10px;
+}
+
+.auth-modal .auth-notice-block {
+  margin-top: 0;
 }
 
 /* 已登录：当前身份卡片 */
@@ -2311,27 +2505,6 @@ body.wb-dragging .wb-split::after {
   margin-top: 16px;
 }
 
-.auth-tip {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  border: 1px solid #eef2f8;
-  border-radius: 10px;
-  background: var(--bg-hover);
-  font-size: var(--fs-xs);
-  line-height: 1.7;
-  color: var(--text-3);
-}
-
-.auth-tip-icon {
-  flex: none;
-  margin-top: 2px;
-  font-size: var(--fs-md);
-  color: var(--primary);
-}
-
 .auth-code {
   display: inline-block;
   padding: 0 5px;
@@ -2342,6 +2515,14 @@ body.wb-dragging .wb-split::after {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: var(--fs-xs);
   line-height: 1.7;
+}
+
+/* 输入框下方的来源说明：紧贴输入框，比主路径更次要 */
+.auth-hint {
+  margin-top: 8px;
+  font-size: var(--fs-xs);
+  line-height: 1.75;
+  color: var(--text-4);
 }
 
 .auth-modal .auth-pane .ant-input,
@@ -2368,14 +2549,14 @@ body.wb-dragging .wb-split::after {
 }
 
 .auth-modal .auth-pane textarea.ant-input {
-  padding: 10px 12px;
+  padding: 11px 14px;
   font-size: var(--fs-sm);
   line-height: 1.7;
   resize: none;
 }
 
 .auth-modal .auth-pane .ant-input-affix-wrapper {
-  padding: 7px 12px;
+  padding: 9px 14px;
   font-size: var(--fs-md);
 }
 
@@ -2384,10 +2565,10 @@ body.wb-dragging .wb-split::after {
   background: #fffafa;
 }
 
-/* ---- 提交按钮：品牌渐变 ---- */
+/* ---- 提交按钮：品牌渐变，与输入框同宽 ---- */
 .auth-modal .auth-submit {
-  height: 44px;
-  margin-top: 12px;
+  height: 46px;
+  margin-top: 16px;
   border-radius: 10px;
   font-size: var(--fs-lg);
   font-weight: 600;
@@ -2459,13 +2640,68 @@ body.wb-dragging .wb-split::after {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  margin-top: 16px;
+  margin-top: 18px;
   padding-top: 14px;
   border-top: 1px dashed var(--border);
   font-size: var(--fs-xs);
   color: var(--text-4);
 }
 
+/* 窄屏（弹框宽度被视口压回）：左栏收成顶部品牌条，表单独占 */
+@media (max-width: 880px) {
+  .auth-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .auth-brand {
+    gap: 14px;
+    padding: 22px 22px 20px;
+  }
+
+  /* 要点清单与底部小字在窄屏只会挤成一团，直接收起 */
+  .auth-brand-points,
+  .auth-brand-foot {
+    display: none;
+  }
+
+  .auth-brand-top {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .auth-brand-mark {
+    padding: 5px;
+    border-radius: 13px;
+  }
+
+  .auth-brand-name {
+    font-size: 20px;
+  }
+
+  .auth-brand-slogan {
+    margin-top: 2px;
+    font-size: var(--fs-xs);
+  }
+
+  .auth-panel {
+    padding: 24px 22px 22px;
+  }
+}
+
+@media (max-width: 520px) {
+  .auth-brand {
+    padding: 18px 18px 16px;
+  }
+
+  .auth-panel {
+    padding: 18px 18px 20px;
+  }
+
+  .auth-foot {
+    text-align: center;
+  }
+}
 /* ---------- 对话区 ---------- */
 .chat-pane {
   /* flex:1 + min-height:0 是关键：右栏是 flex 列容器，对话区必须能收缩，
@@ -2478,23 +2714,191 @@ body.wb-dragging .wb-split::after {
 }
 
 /* 多 Agent 时：输入框上方可选当前会话使用的 Agent */
-.chat-agent-bar {
-  flex: none;
+/* 输入框本体：正文 + 内嵌工具条的圆角盒（左「+」/ 右 Agent + 停止 + 发送） */
+.composer-box {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 16px 0;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
   background: var(--bg-elevated);
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
 }
 
-.chat-agent-bar-label {
+.composer-box:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--tint-primary);
+}
+
+.composer-box.is-busy {
+  background: var(--bg-soft);
+}
+
+/* 正文去掉 antd 自带边框/底色，border 由外层 .composer-box 承担 */
+.composer-box textarea.ant-input,
+.composer-box textarea.ant-input:hover,
+.composer-box textarea.ant-input:focus,
+.composer-box textarea.ant-input:disabled {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  color: var(--text-1);
+  resize: none;
+}
+
+.composer-box textarea.ant-input::placeholder {
+  color: var(--text-4);
+}
+
+.composer-box textarea.ant-input:disabled {
+  color: var(--text-3);
+}
+
+.composer-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 30px;
+}
+
+.composer-tools-l,
+.composer-tools-r {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.composer-tools-r {
+  flex: none;
+}
+
+.composer-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--text-4);
+}
+
+/* 工具条上的图标按钮（+ / 停止） */
+.composer-icon-btn {
   flex: none;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 16px;
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease;
+}
+
+.composer-icon-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--primary);
+}
+
+.composer-icon-btn:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+.composer-icon-btn.is-danger {
+  color: var(--danger);
+}
+
+.composer-icon-btn.is-danger:hover:not(:disabled) {
+  background: var(--tint-danger);
+  color: var(--danger);
+}
+
+/* Agent 选择：收在输入框内部右下角（会话有多个 Agent 时才出现） */
+.composer-chip {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
+  max-width: 200px;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--text-2);
   font-size: var(--fs-xs);
-  color: var(--text-3);
+  cursor: pointer;
+  transition:
+    border-color 0.14s ease,
+    color 0.14s ease,
+    background 0.14s ease;
+}
+
+.composer-chip:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--tint-primary);
+  color: var(--primary);
+}
+
+.composer-chip:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+.composer-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.composer-chip-caret {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.composer-agent-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 160px;
+}
+
+.composer-agent-opt-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.composer-agent-opt-tag {
+  margin-left: 6px;
+  font-size: var(--fs-xs);
+  font-style: normal;
+  color: var(--danger);
+}
+
+.composer-agent-opt-check {
+  color: var(--primary);
+}
+
+/* 发送按钮：正圆（不用 antd 的 shape=circle —— 它的 min-width:34px 由运行时注入，压不住） */
+.composer-send.ant-btn {
+  flex: none;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
 }
 
 /* Agent 回复 Markdown 渲染（对话气泡内，较 .fv-md 更紧凑） */
@@ -3857,11 +4261,6 @@ pre.diff {
 }
 
 @media (max-width: 520px) {
-  /* 弹框头部标语胶囊与标题抢宽度，小屏直接隐藏（宽度自适应走 antd 响应式 width） */
-  .auth-head-slogan {
-    display: none;
-  }
-
   /* 版本历史等宽抽屉（720px）改为全屏 */
   .ant-drawer-content-wrapper {
     width: 100vw !important;

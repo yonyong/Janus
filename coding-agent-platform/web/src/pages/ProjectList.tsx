@@ -37,6 +37,7 @@ import {
   Project,
 } from '../api'
 import ProjectCard from '../components/ProjectCard'
+import FolderPathInput from '../components/FolderPathInput'
 
 const PAGE_SIZE = 9
 
@@ -294,7 +295,7 @@ export default function ProjectList() {
             rules={[{ required: true, message: '请输入本地磁盘绝对路径' }]}
             extra="Agent 将在此目录读取与修改代码，请确保路径存在"
           >
-            <Input placeholder="D:/dev/my-project" />
+            <FolderPathInput placeholder="D:/dev/my-project" />
           </Form.Item>
         </Form>
       </Modal>

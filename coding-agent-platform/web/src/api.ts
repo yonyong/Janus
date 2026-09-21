@@ -1358,6 +1358,26 @@ export const adminUpdateProject = (pid: number, body: { name?: string; disk_path
     body: JSON.stringify(body),
   }) as Promise<Project>
 
+export interface DirEntry {
+  name: string
+  path: string
+}
+
+/** 目录列举结果：path 为空表示在盘符/根视图，此时看 roots。 */
+export interface DirListing {
+  path: string
+  parent: string
+  dirs: DirEntry[]
+  roots: string[]
+}
+
+/** 列出本机目录（管理员）：path 留空返回盘符/根列表，用于网页版目录选择器。 */
+export const adminListDirs = (path: string) => {
+  const u = new URL(adminUrl('/api/admin/fs/dirs'))
+  if (path) u.searchParams.set('path', path)
+  return req(u.toString()) as Promise<DirListing>
+}
+
 export const adminListTokens = () =>
   req(adminUrl('/api/admin/tokens')) as Promise<AdminToken[]>
 

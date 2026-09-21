@@ -1,0 +1,2 @@
+﻿port 5173 : UP
+port 8000 : UP
