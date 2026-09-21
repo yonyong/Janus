@@ -30,7 +30,7 @@ import {
   listRequirementVersions,
   restoreRequirementVersion,
 } from '../api'
-import RichText from './RichText'
+import AgentMarkdown from './AgentMarkdown'
 
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
 
@@ -301,7 +301,7 @@ export default function VersionHistoryDrawer({
                 <div className="vh-doc">
                   <div className="vh-doc-title">{detail.title}</div>
                   {detail.description.trim() ? (
-                    <RichText text={detail.description} />
+                    <AgentMarkdown text={detail.description} variant="doc" />
                   ) : (
                     <Typography.Text type="secondary">（空白文档）</Typography.Text>
                   )}
