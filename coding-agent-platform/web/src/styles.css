@@ -4001,6 +4001,8 @@ pre.diff {
   padding: 9px 2px;
   border-radius: 10px;
   border: 1px solid transparent;
+  /* 原生 button 默认浅灰底，暗色主题下会整块发白；显式透明 */
+  background: transparent;
   color: var(--text-3);
   font-size: 12px;
   cursor: pointer;
