@@ -64,6 +64,15 @@ function fmtTime(s?: string | null, prefixFallback?: string): string {
   return raw.replace('T', ' ').slice(0, 16)
 }
 
+/** 悬浮预览截断：避免长文档把 Tooltip 撑成整屏竖条。 */
+const REQ_DESC_TIP_MAX = 280
+
+function truncateReqDesc(text: string, max = REQ_DESC_TIP_MAX): string {
+  const t = text.trim()
+  if (t.length <= max) return t
+  return `${t.slice(0, max).trimEnd()}…`
+}
+
 export default function RequirementList() {
   const { pid } = useParams()
   const projectId = Number(pid)
@@ -290,10 +299,18 @@ export default function RequirementList() {
                 >
                   {/* 描述固定 4 行高度：同行卡片等高，底部操作对齐 */}
                   <div className="req-tile-desc">
-                    <Tooltip title={r.description ? <span style={{ whiteSpace: 'pre-wrap' }}>{r.description}</span> : ''}>
-                      <span>{r.description || ''}</span>
-                    </Tooltip>
-                    {!r.description && <Typography.Text type="secondary">（无描述）</Typography.Text>}
+                    {r.description ? (
+                      <Tooltip
+                        title={
+                          <div className="req-tile-desc-tip">{truncateReqDesc(r.description)}</div>
+                        }
+                        styles={{ body: { maxWidth: 360, padding: '8px 10px' } }}
+                      >
+                        <span>{r.description}</span>
+                      </Tooltip>
+                    ) : (
+                      <Typography.Text type="secondary">（无描述）</Typography.Text>
+                    )}
                   </div>
                   {/* 状态 + 时间元信息行 */}
                   <div

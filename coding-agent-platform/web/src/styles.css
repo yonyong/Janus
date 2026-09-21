@@ -514,6 +514,21 @@ body {
   word-break: break-word;
 }
 
+/* 需求卡片描述悬浮预览：限宽限高，长文本截断，避免整屏竖条 */
+.req-tile-desc-tip {
+  max-width: 340px;
+  max-height: 176px; /* 约 8 行 */
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+  line-clamp: 8;
+  font-size: 12px;
+  line-height: 22px;
+}
+
 .ant-card.app-tile.req-tile .req-tile-meta {
   margin-top: auto;
 }
