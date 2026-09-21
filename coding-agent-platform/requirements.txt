@@ -2,3 +2,5 @@ fastapi
 uvicorn[standard]
 python-multipart
 pyyaml
+# 桌面应用外壳：仅打包 exe 时需要，纯 Web 部署可不安
+pywebview

@@ -1,8 +1,0 @@
-﻿.venv
-.wheels
-agents
-backend
-data
-tools
-web
-__pycache__

@@ -102,3 +102,26 @@ node tools/ui_smoke_workbench.mjs "http://127.0.0.1:8000/?token=<令牌>#/workbe
 - codebuddy 适配器 `--output-format json`：stdout 是事件数组，取最后带 usage 的 assistant 消息。
 - 审计 backend/audit.py：写不进库先进 deferred 队列；接口 /api/admin/audit-logs、/api/admin/invocations；
   页面 /audit/logs、/audit/tokens（仅管理员）。CDP UI 冒烟调试端口 `9336 + pid%400`，收尾 taskkill /T /F。
+
+## 桌面应用打包（2026-09-21 起）
+- 入口：`pack.bat`（图标→依赖→前端→PyInstaller）+ `pack_launch.py`（pywebview 原生窗口启动器）。
+  双击 `dist\Janus\Janus.exe` 起服务并弹窗；日志 `dist\Janus\logs\janus.log`。
+- **PyInstaller 6.x onedir 把 `--add-data` 资源放进 `dist/Janus/_internal/`（= sys._MEIPASS）**，
+  顶层只有 exe。启动器必须区分 `RES_DIR`（_MEIPASS，只读：web/dist、assets、内置 .env）
+  与 `APP_DIR`（exe 旁，可写：data/、logs/）。搞混 = 前端 404 + 数据库写不进。
+- **关键配置全部外置到 exe 同级的 `config.ini`**（2026-09-21 起）：`[server]` port/host、
+  `[admin]` password、`[share]` public_base_url/public_port、`[log]` level。不再打包内置 `.env`
+  （避免出现两个配置源）。`_ensure_config_ini()` 首启生成（口令随机；exe 旁若有 .env 则迁移其值），
+  `_apply_ini()` 把值落到 CONFIG 与 os.environ（后者让 `public_share_base()` 这类运行时读环境变量的
+  逻辑也能生效）；打包收尾由 `tools/make_config_ini.py dist/Janus` 生成现成模板（已存在则跳过，
+  不覆盖用户改动）。config.py 的 BASE 打包后指向临时目录，走 config.ini 后不再依赖它。
+- 管理员口令走 **query 参数** `admin`（`/api/admin/verify?admin=xxx`），不是 HTTP header。
+- 图标：`assets/janus-icon.svg`（1024 矢量源）→ `tools/make_icon.mjs`（sharp 渲染 + 纯 Node 拼 ICO）
+  → `assets/janus.ico`（7 尺寸）。exe 图标靠 `--icon`；Windows 窗口/任务栏图标继承 exe，
+  `webview.start(icon=)` 只在 GTK/QT 生效。验证：pefile 读 RT_ICON 应为 7 帧。
+- 端口自动顺延（8000..8049），`_port_free` 需同时探测 127.0.0.1 与 0.0.0.0（只测回环会漏掉
+  别人占着 `0.0.0.0:8000` 的情况）；单实例用命名互斥体 `Local\JanusDesktopApp` + FindWindow 唤起原窗口。
+- pip 清华镜像不可达，用 `--index-url https://pypi.org/simple`。
+- PyInstaller 覆盖旧 dist 会触发 safe-delete 拦截（文件数 >50）：先 `mv dist/Janus dist/_tmp` 再打包。
+- 发布注意：`dist\Janus\config.ini` 里的管理员口令是随机生成的，发布前确认；
+  目标机器需 WebView2 运行时（Win10 1803+/Win11 自带）。

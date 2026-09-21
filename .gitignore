@@ -3,6 +3,7 @@
 /.comet/*
 !/.comet/config.yaml
 # <<< Comet managed project state <<<
-/dist/**
-/build/**
+**/dist/**
+**/build/**
 .idea/
+*.log
