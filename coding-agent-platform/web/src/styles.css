@@ -2608,9 +2608,85 @@ body.wb-dragging .wb-split::after {
   opacity: 0.6;
 }
 
+/* 长会话轻提示：贴在输入框上方，不挡消息列表 */
 .chat-session-hint {
-  margin: 8px 12px 0;
-  flex-shrink: 0;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 16px 0;
+  background: var(--bg-elevated);
+}
+
+.chat-session-hint-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: 6px;
+  background: var(--tint-primary);
+  border: 1px solid var(--tint-primary-border);
+  color: var(--primary);
+  font-size: var(--fs-xs);
+}
+
+.chat-session-hint-text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  line-height: 1.45;
+}
+
+.chat-session-hint-action {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border: 1px solid var(--tint-primary-border);
+  border-radius: 6px;
+  background: var(--tint-primary);
+  color: var(--primary);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.chat-session-hint-action:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--primary);
+}
+
+.chat-session-hint-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.chat-session-hint-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-4);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.chat-session-hint-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-2);
 }
 
 @keyframes stream-caret-blink {

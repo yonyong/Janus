@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState } from 'react'
-import { Alert, Avatar, Button, Empty, Modal, Select, Space, Spin, Typography } from 'antd'
+import { Avatar, Empty, Modal, Select, Space, Spin, Typography } from 'antd'
 import {
   ArrowRightOutlined,
   BulbOutlined,
@@ -202,27 +202,6 @@ const RequirementPane = forwardRef<
 
   return (
     <div className="chat-pane">
-      {showSessionHint && (
-        <Alert
-          className="chat-session-hint"
-          type="warning"
-          showIcon
-          closable
-          closeIcon={<CloseOutlined />}
-          onClose={() => setHintDismissed(true)}
-          message="同会话上下文会越积越大，Token 容易飙升"
-          description={
-            <span>
-              本会话已进行 {userRounds} 轮对话。若任务可独立，建议新开会话继续，避免续聊把历史反复送进模型。
-            </span>
-          }
-          action={
-            <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => onNewSession?.()} disabled={busy}>
-              新建会话
-            </Button>
-          }
-        />
-      )}
       <div className="chat-scroll" ref={scrollRef}>
         {messages.length === 0 && !busy ? (
           <Empty
@@ -328,6 +307,34 @@ const RequirementPane = forwardRef<
             }))}
             onChange={(v) => onChangeAgent(Number(v))}
           />
+        </div>
+      )}
+
+      {showSessionHint && (
+        <div className="chat-session-hint" role="status">
+          <span className="chat-session-hint-icon" aria-hidden>
+            <BulbOutlined />
+          </span>
+          <span className="chat-session-hint-text">
+            本会话已 {userRounds} 轮，上下文会越积越大。任务可独立时建议新开会话。
+          </span>
+          <button
+            type="button"
+            className="chat-session-hint-action"
+            disabled={busy}
+            onClick={() => onNewSession?.()}
+          >
+            <PlusOutlined />
+            新建会话
+          </button>
+          <button
+            type="button"
+            className="chat-session-hint-close"
+            aria-label="关闭提示"
+            onClick={() => setHintDismissed(true)}
+          >
+            <CloseOutlined />
+          </button>
         </div>
       )}
 
