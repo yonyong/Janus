@@ -149,6 +149,24 @@ def test_run_passes_cli_args_and_remembers():
     assert items[0]["last_params"]["env"] == "prod"
 
 
+def test_run_started_at_is_local_wall_clock():
+    """started_at 存本地墙钟时间并原样展示；不得写成 UTC 再被当成本地（会差 8 小时）。"""
+    from datetime import datetime
+
+    conn = _db()
+    root, rq = _fixture(conn)
+    d = rq["dir_name"]
+    SCR.write_script(root, d, "echo.py", SAMPLE)
+    before = datetime.now().replace(microsecond=0)
+    res = SCR.run_script(root, d, "echo.py", {"env": "prod", "dry_run": False})
+    after = datetime.now().replace(microsecond=0)
+    assert res["ran"] is True
+    started = datetime.strptime(res["run"]["started_at"], "%Y-%m-%d %H:%M:%S")
+    assert before <= started <= after
+    # 运行 id 也不再带 UTC 的 Z 后缀
+    assert not str(res["run"]["id"]).endswith("Z")
+
+
 def test_run_missing_required():
     conn = _db()
     root, rq = _fixture(conn)

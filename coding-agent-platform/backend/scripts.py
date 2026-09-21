@@ -14,7 +14,7 @@ import os
 import re
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 
 import yaml
 
@@ -348,8 +348,9 @@ def run_script(root: str, dir_name: str, name: str, params: dict | None = None,
     if not interp:
         return {"ran": False, "reason": "unsupported_ext"}
 
-    started = datetime.now(timezone.utc)
-    run_id = started.strftime("%Y%m%dT%H%M%SZ")
+    # 与审计 / Agent 调用留痕一致：存本地时间，日志页直接展示、无需前端再换算
+    started = datetime.now()
+    run_id = started.strftime("%Y%m%dT%H%M%S")
     t0 = time.monotonic()
     tmp_path = None
     try:
