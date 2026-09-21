@@ -18,7 +18,6 @@ import {
   CodeOutlined,
   DeleteOutlined,
   EditOutlined,
-  FormOutlined,
   PlayCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -110,8 +109,9 @@ function missingRequired(params: ScriptParamDef[], values: Record<string, string
 }
 
 /**
- * 通用脚本面板：.janus/{dir}/script/ 列表，支持参数 / 编辑 / 执行 / 日志 / AI 协助。
+ * 通用脚本面板：.janus/{dir}/script/ 列表，支持编辑 / 执行确认 / 日志 / AI 协助。
  * 与用例面板的 usecase/accept.* 总验收脚本分离。
+ * 点「执行」一律先弹确认框（有参数则填写，无参数也需确认）再跑。
  */
 export default function ScriptPane({
   token,
@@ -133,7 +133,7 @@ export default function ScriptPane({
   const [loading, setLoading] = useState(false)
   const [runningName, setRunningName] = useState<string | null>(null)
 
-  const [paramOpen, setParamOpen] = useState<ScriptItem | null>(null)
+  const [runOpen, setRunOpen] = useState<ScriptItem | null>(null)
   const [paramValues, setParamValues] = useState<Record<string, string | number | boolean>>({})
 
   const [editOpen, setEditOpen] = useState(false)
@@ -179,9 +179,9 @@ export default function ScriptPane({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rid, token, refreshSignal])
 
-  const openParams = (item: ScriptItem) => {
+  const openRunConfirm = (item: ScriptItem) => {
     setParamValues(buildInitialParams(item))
-    setParamOpen(item)
+    setRunOpen(item)
   }
 
   const doRun = async (item: ScriptItem, values: Record<string, string | number | boolean>) => {
@@ -189,7 +189,6 @@ export default function ScriptPane({
     const miss = missingRequired(item.params, values)
     if (miss.length) {
       message.warning(`请填写必填参数：${miss.map((p) => p.label || p.name).join('、')}`)
-      openParams(item)
       return
     }
     setRunningName(item.name)
@@ -199,6 +198,7 @@ export default function ScriptPane({
         message.error(`未能执行：${r.reason || '未知原因'}${r.detail ? ' · ' + r.detail : ''}`)
         return
       }
+      setRunOpen(null)
       message[r.exit_code === 0 ? 'success' : 'warning'](
         `已执行 ${item.name}（退出码 ${r.exit_code}，${r.duration_ms ?? 0}ms）`,
       )
@@ -220,16 +220,7 @@ export default function ScriptPane({
   }
 
   const onExecuteClick = (item: ScriptItem) => {
-    const values = buildInitialParams(item)
-    const miss = missingRequired(item.params, values)
-    if (miss.length || (item.params || []).length > 0) {
-      // 有参数时优先打开参数表（预填上次），避免误跑；无必填缺省可直接点「执行」
-      if (miss.length) {
-        openParams(item)
-        return
-      }
-    }
-    void doRun(item, values)
+    openRunConfirm(item)
   }
 
   const openEdit = async (item: ScriptItem) => {
@@ -341,8 +332,8 @@ export default function ScriptPane({
   }
 
   const paramForm = useMemo(() => {
-    if (!paramOpen) return null
-    return (paramOpen.params || []).map((p) => {
+    if (!runOpen) return null
+    return (runOpen.params || []).map((p) => {
       const val = paramValues[p.name]
       if (p.type === 'boolean') {
         return (
@@ -387,7 +378,7 @@ export default function ScriptPane({
         </Form.Item>
       )
     })
-  }, [paramOpen, paramValues])
+  }, [runOpen, paramValues])
 
   if (disabled) {
     return (
@@ -467,14 +458,6 @@ export default function ScriptPane({
                   </div>
                 </div>
                 <div className="script-row-actions">
-                  <Tooltip title="参数">
-                    <Button
-                      size="small"
-                      icon={<FormOutlined />}
-                      disabled={running}
-                      onClick={() => openParams(it)}
-                    />
-                  </Tooltip>
                   <Tooltip title="编辑">
                     <Button
                       size="small"
@@ -517,29 +500,32 @@ export default function ScriptPane({
       )}
 
       <Modal
-        title={paramOpen ? `参数 · ${paramOpen.display_name || paramOpen.name}` : '参数'}
-        open={!!paramOpen}
-        onCancel={() => setParamOpen(null)}
+        title={runOpen ? `执行 · ${runOpen.display_name || runOpen.name}` : '执行'}
+        open={!!runOpen}
+        onCancel={() => setRunOpen(null)}
         width={480}
         destroyOnHidden
         footer={
           <Space>
-            <Button onClick={() => setParamOpen(null)}>取消</Button>
+            <Button onClick={() => setRunOpen(null)}>取消</Button>
             <Button
               type="primary"
+              icon={<PlayCircleOutlined />}
               loading={!!runningName}
               onClick={() => {
-                if (!paramOpen) return
-                void doRun(paramOpen, paramValues).then(() => setParamOpen(null))
+                if (!runOpen) return
+                void doRun(runOpen, paramValues)
               }}
             >
-              保存参数并执行
+              确认执行
             </Button>
           </Space>
         }
       >
-        {(paramOpen?.params || []).length === 0 ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该脚本未声明参数" />
+        {(runOpen?.params || []).length === 0 ? (
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+            该脚本没有需要填写的参数，确认后立即执行 <Typography.Text code>{runOpen?.name}</Typography.Text>。
+          </Typography.Paragraph>
         ) : (
           <Form layout="vertical">{paramForm}</Form>
         )}
