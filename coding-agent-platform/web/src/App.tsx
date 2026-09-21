@@ -263,21 +263,17 @@ function Shell() {
             items={[
               { key: '/', icon: <AppstoreOutlined />, label: '工作台' },
               { key: '/projects', icon: <FolderOutlined />, label: '项目空间' },
-              // 仅管理员可见：Agent 管理、管理台属于后台管理入口。
+              // 实时日志按令牌过滤项目，业务人员也该看得到自己项目的运行情况，故不限定管理员
+              { key: '/logs', icon: <FileTextOutlined />, label: '实时日志' },
+              // 仅管理员可见：Agent 管理、管理台、审计属于后台管理入口。
               ...(isAdmin ? [{ key: '/agents', icon: <RobotOutlined />, label: 'Agent 管理' }] : []),
-              // 审计分类：实时日志对全体授权用户可见（按令牌过滤项目）；操作日志 / Token 审计仅管理员。
-              {
-                key: 'audit',
-                icon: <AuditOutlined />,
-                label: '审计',
-                children: [
-                  {
-                    key: '/logs',
-                    icon: <FileTextOutlined />,
-                    label: '实时日志',
-                  },
-                  ...(isAdmin
-                    ? [
+              ...(isAdmin
+                ? [
+                    {
+                      key: 'audit',
+                      icon: <AuditOutlined />,
+                      label: '审计',
+                      children: [
                         {
                           key: '/audit/logs',
                           icon: <BarChartOutlined />,
@@ -288,16 +284,16 @@ function Shell() {
                           icon: <ThunderboltOutlined />,
                           label: 'Token 审计',
                         },
-                      ]
-                    : []),
-                ],
-              },
+                      ],
+                    },
+                  ]
+                : []),
               ...(isAdmin
                 ? [{ key: '/admin', icon: <SafetyCertificateOutlined />, label: '管理台' }]
                 : []),
             ]}
-            // 直接落到审计子页时自动展开父菜单，否则选中项藏在一个收起的组里。
-            defaultOpenKeys={pathname === '/logs' || pathname.startsWith('/audit') ? ['audit'] : []}
+            // 直接落到审计页时自动展开父菜单，否则选中项藏在一个收起的组里。
+            defaultOpenKeys={pathname.startsWith('/audit') ? ['audit'] : []}
             onClick={({ key }) => navigate(key)}
           />
 
