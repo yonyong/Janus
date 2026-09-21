@@ -596,7 +596,9 @@ export default function ScriptPane({
         title={`执行日志 · ${logsName}`}
         open={logsOpen}
         onCancel={() => setLogsOpen(false)}
-        width={780}
+        width="92vw"
+        style={{ top: 24, maxWidth: '92vw', paddingBottom: 0 }}
+        wrapClassName="script-logs-modal"
         destroyOnHidden
         footer={
           <Button onClick={() => setLogsOpen(false)}>关闭</Button>
