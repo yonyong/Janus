@@ -1,5 +1,4 @@
 """通用脚本：列表、frontmatter、保存、执行传参、.runs 记录。"""
-import os
 import tempfile
 from pathlib import Path
 
@@ -7,6 +6,7 @@ from backend.db import get_conn, init_db
 from backend import repositories as R
 from backend import docs as WD
 from backend import scripts as SCR
+from backend import script_proc as SP
 
 
 def _db():
@@ -141,3 +141,55 @@ def test_runs_cap():
         SCR.run_script(root, d, "n.py", {})
     runs = SCR.list_runs(root, d, "n.py")
     assert len(runs) == 20
+
+
+def test_run_chinese_stdout_survives_utf8_contract():
+    """中文 stdout 在 UTF-8 父子契约下完整进 .runs（不因 locale 解码失败变空）。"""
+    conn = _db()
+    root, rq = _fixture(conn)
+    d = rq["dir_name"]
+    content = (
+        "---\nname: zh\n---\n"
+        "print('未同步')\n"
+        "print('原始文件没有同步', flush=True)\n"
+    )
+    SCR.write_script(root, d, "zh.py", content)
+    res = SCR.run_script(root, d, "zh.py", {})
+    assert res["ran"] is True and res["exit_code"] == 0
+    assert "未同步" in res["output"]
+    assert "原始文件没有同步" in res["output"]
+    runs = SCR.list_runs(root, d, "zh.py")
+    assert runs[0]["output"] and "未同步" in runs[0]["output"]
+
+
+def test_run_merges_janus_script_log_when_pipe_empty():
+    """脚本只写 JANUS_SCRIPT_LOG、不 print 时，平台仍能从副通道回读。"""
+    conn = _db()
+    root, rq = _fixture(conn)
+    d = rq["dir_name"]
+    content = (
+        "---\nname: logonly\n---\n"
+        "import os\n"
+        "p = os.environ['JANUS_SCRIPT_LOG']\n"
+        "open(p, 'a', encoding='utf-8').write('[结果] 仅日志文件\\n')\n"
+    )
+    SCR.write_script(root, d, "logonly.py", content)
+    res = SCR.run_script(root, d, "logonly.py", {})
+    assert res["ran"] is True and res["exit_code"] == 0
+    assert "[结果] 仅日志文件" in res["output"]
+
+
+def test_build_script_env_forces_python_utf8():
+    env = SP.build_script_env("/tmp/x.log")
+    assert env["PYTHONUTF8"] == "1"
+    assert env["PYTHONIOENCODING"] == "utf-8"
+    assert env["JANUS_SCRIPT_LOG"] == "/tmp/x.log"
+
+
+def test_merge_replaces_undecodable_via_errors_replace():
+    """非法 UTF-8 字节不应抛错，应以 replace 进合并结果。"""
+    bad = b"ok\xff\xfe" + "中文".encode("utf-8")
+    out = SP.merge_script_output(bad, None, None)
+    assert "ok" in out
+    assert "\ufffd" in out
+    assert "中文" in out

@@ -52,7 +52,7 @@ const FAQ = [
   },
   {
     q: '「脚本」和用例里的验收脚本有什么区别？',
-    a: '「脚本」Tab 管理 .janus/{dir}/script/ 下的通用可参数化脚本；用例面板的总验收脚本仍是 usecase/accept.*，专用于验收回写用例状态。',
+    a: '「脚本」Tab 管理 .janus/{dir}/script/ 下的通用可参数化脚本；用例面板的总验收脚本仍是 usecase/accept.*，专用于验收回写用例状态。平台采集 stdout/stderr（UTF-8）；脚本勿自行改编码，可选落盘只写 JANUS_SCRIPT_LOG。',
   },
   {
     q: '新建会话会发生什么？',

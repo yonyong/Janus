@@ -3,13 +3,15 @@
 与 usecase/accept.*（总验收脚本）分离。正文可带 YAML frontmatter 声明 params；
 执行时去掉 frontmatter 写入临时文件，以 CLI ``--name value`` 传参，并把结果记入
 同目录 ``.runs/{stem}.json``（含 last_params）。
+
+输出约定见 ``script_proc``：父子 UTF-8 一致采集 stdout/stderr，并注入
+``JANUS_SCRIPT_LOG`` 作为可选日志副通道。
 """
 from __future__ import annotations
 
 import json
 import os
 import re
-import subprocess
 import tempfile
 import time
 from datetime import datetime, timezone
@@ -18,6 +20,7 @@ import yaml
 
 from . import docs as WD
 from . import files as FS
+from . import script_proc as SP
 
 _INTERPRETERS = {
     ".py": ["python3"],
@@ -309,25 +312,30 @@ def run_script(root: str, dir_name: str, name: str, params: dict | None = None,
         # .sh 需要可执行位时仍用 bash 解释器，不必 chmod
         cmd = interp + [tmp_path] + cli
         try:
-            proc = subprocess.run(cmd, cwd=base, capture_output=True, text=True, timeout=timeout)
+            captured = SP.run_captured(cmd, cwd=base, timeout=timeout)
         except FileNotFoundError as e:
             return {"ran": False, "reason": "interpreter_missing", "detail": str(e),
                     "entry": name, "lang": info["lang"]}
-        except subprocess.TimeoutExpired:
-            return {"ran": False, "reason": "timeout", "entry": name, "timeout": timeout}
         except OSError as e:  # noqa: BLE001
             return {"ran": False, "reason": "os_error", "detail": str(e), "entry": name}
-        out = proc.stdout or ""
-        if proc.stderr:
-            out = (out + "\n" if out else "") + "[stderr]\n" + proc.stderr
+        if captured.get("timed_out"):
+            return {
+                "ran": False,
+                "reason": "timeout",
+                "entry": name,
+                "timeout": timeout,
+                "output": captured.get("output") or "",
+            }
+        out = captured.get("output") or ""
         truncated = len(out) > _OUTPUT_LIMIT
         if truncated:
             out = out[:_OUTPUT_LIMIT] + "\n…（输出已截断）"
         duration_ms = int((time.monotonic() - t0) * 1000)
+        exit_code = int(captured.get("returncode") or 0)
         record = {
             "id": run_id,
             "started_at": started.strftime("%Y-%m-%d %H:%M:%S"),
-            "exit_code": proc.returncode,
+            "exit_code": exit_code,
             "params": last_params,
             "output": out,
             "duration_ms": duration_ms,
@@ -340,7 +348,7 @@ def run_script(root: str, dir_name: str, name: str, params: dict | None = None,
         _save_runs(root, dir_name, name, store)
         return {
             "ran": True,
-            "exit_code": proc.returncode,
+            "exit_code": exit_code,
             "output": out,
             "entry": name,
             "truncated": truncated,

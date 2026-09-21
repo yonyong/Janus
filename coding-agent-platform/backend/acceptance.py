@@ -8,11 +8,11 @@
 只发现与执行既有脚本，不生成脚本（生成是 Agent 的活，见「生成/更新验收脚本」指令）。
 """
 import os
-import subprocess
 from datetime import datetime, timezone
 
 from . import docs as WD
 from . import files as FS
+from . import script_proc as SP
 
 # 入口扩展名 → 解释器。约定入口文件名 accept.*（见 docs.ACCEPT_CANDIDATES）。
 _INTERPRETERS = {
@@ -100,19 +100,23 @@ def run_script(root: str, dir_name: str, timeout: int = _RUN_TIMEOUT) -> dict:
     interp = _INTERPRETERS.get(ext)
     cmd = (interp + [found["abspath"]]) if interp else [found["abspath"]]
     try:
-        proc = subprocess.run(cmd, cwd=base, capture_output=True, text=True, timeout=timeout)
+        captured = SP.run_captured(cmd, cwd=base, timeout=timeout)
     except FileNotFoundError as e:
         return {"ran": False, "reason": "interpreter_missing",
                 "detail": str(e), "entry": found["name"], "lang": _lang_of(found["name"])}
-    except subprocess.TimeoutExpired:
-        return {"ran": False, "reason": "timeout", "entry": found["name"], "timeout": timeout}
     except OSError as e:  # noqa: BLE001
         return {"ran": False, "reason": "os_error", "detail": str(e), "entry": found["name"]}
-    out = (proc.stdout or "")
-    if proc.stderr:
-        out = (out + "\n" if out else "") + "[stderr]\n" + proc.stderr
+    if captured.get("timed_out"):
+        return {
+            "ran": False,
+            "reason": "timeout",
+            "entry": found["name"],
+            "timeout": timeout,
+            "output": captured.get("output") or "",
+        }
+    out = captured.get("output") or ""
     truncated = len(out) > _OUTPUT_LIMIT
     if truncated:
         out = out[:_OUTPUT_LIMIT] + "\n…（输出已截断）"
-    return {"ran": True, "exit_code": proc.returncode, "output": out,
+    return {"ran": True, "exit_code": int(captured.get("returncode") or 0), "output": out,
             "entry": found["name"], "truncated": truncated}
