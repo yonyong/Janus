@@ -229,7 +229,7 @@ export default function AuthLoginModal() {
               <div>
                 令牌由项目管理者签发，粘贴分享链接里 <code className="auth-code">token=</code>{' '}
                 后面那段即可，链接形如{' '}
-                <code className="auth-code">http://host:8000/?token=xxx</code>。
+                <code className="auth-code">http://局域网IP:5173/?token=xxx</code>。
               </div>
             </div>
             <Input.TextArea

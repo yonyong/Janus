@@ -414,7 +414,7 @@ def test_reveal_token_route_is_audited_without_leaking_secret():
     tok = "reveal-secret-token-9876543210"
     R.TokenRepo.create(conn, tok, [1], None, "给张三")
     tid = R.TokenRepo.resolve(conn, tok)["id"]
-    app_module.admin_reveal_token(tid=tid, db=conn, request=None, _ok=True)
+    app_module.admin_reveal_token(tid=tid, db=conn, _ok=True)
     audit_text = json.dumps(R.AuditLogRepo.query(conn, {"action": "token.reveal"})["items"],
                             ensure_ascii=False)
     assert "token.reveal" in audit_text
