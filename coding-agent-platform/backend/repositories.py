@@ -563,6 +563,43 @@ class MessageRepo:
         return cur.lastrowid
 
     @staticmethod
+    def attach_run_meta(conn, session_id, elapsed_ms=None, usage=None):
+        """把本轮运行的耗时 / Token 挂到该会话最近一条 agent 消息上。
+
+        对话区气泡底部展示依赖这些字段；刷新后从 messages 回放，不依赖审计页。
+        没有 agent 消息（例如启动前就失败）时静默跳过。
+        """
+        row = conn.execute(
+            """SELECT id FROM messages
+               WHERE session_id=? AND role='agent' AND pane='message'
+               ORDER BY id DESC LIMIT 1""",
+            (session_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        mid = row["id"]
+        u = usage if isinstance(usage, dict) else {}
+        prompt = u.get("prompt_tokens")
+        completion = u.get("completion_tokens")
+        total = u.get("total_tokens")
+        if total is None and (prompt is not None or completion is not None):
+            total = int(prompt or 0) + int(completion or 0)
+        conn.execute(
+            """UPDATE messages
+               SET elapsed_ms=?, prompt_tokens=?, completion_tokens=?, total_tokens=?
+               WHERE id=?""",
+            (
+                int(elapsed_ms) if elapsed_ms is not None else None,
+                int(prompt) if prompt is not None else None,
+                int(completion) if completion is not None else None,
+                int(total) if total is not None else None,
+                mid,
+            ),
+        )
+        conn.commit()
+        return mid
+
+    @staticmethod
     def list_by_session(conn, session_id):
         return [row_to_dict(r) for r in
                 conn.execute("SELECT * FROM messages WHERE session_id=? ORDER BY id", (session_id,)).fetchall()]

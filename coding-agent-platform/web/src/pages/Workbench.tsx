@@ -40,6 +40,7 @@ import { buildFlowCommands, verifyCasesPrompt } from '../components/FlowCommands
 import FileWorkArea, { STAGE_CAT } from '../components/FileWorkArea'
 import type { Cat } from '../components/FileWorkArea'
 import RequirementPane from '../components/RequirementPane'
+import { runMetaFromDone, type RunMeta } from '../runMeta'
 
 /**
  * 沉浸式工作台（2026-09 重设计版）：
@@ -67,7 +68,7 @@ export default function Workbench() {
   const [stage, setStage] = useState<Stage>('clarify')
   // 左栏分类（受控）：阶段变化时联动默认分类，快捷键 Alt+1~6 也能直接切换
   const [cat, setCat] = useState<Cat>('req')
-  const [conv, setConv] = useState<{ role: string; content: string }[]>([])
+  const [conv, setConv] = useState<({ role: string; content: string } & RunMeta)[]>([])
   // 流式输出：一次运行中 Agent 的全部输出（各轮流式正文 + 最终答复）都汇总进
   // 同一条气泡（streamText 实时追加），done 时整体转正为一条对话消息；
   // 刷新后从库里回放最终答复。streamRef 是 streamText 的同步镜像，供事件回调读取最新值。
@@ -127,7 +128,7 @@ export default function Workbench() {
       try {
         const msgs: Message[] = await sessionMessages(token, sessionId)
         if (!active) return
-        const c: { role: string; content: string }[] = []
+        const c: ({ role: string; content: string } & RunMeta)[] = []
         const code: any[] = []
         const test: any[] = []
         for (const m of msgs) {
@@ -138,7 +139,14 @@ export default function Workbench() {
           } else if (m.pane === 'test') {
             test.push({ type: 'test', pane: 'test', text: m.content })
           } else {
-            c.push({ role: 'agent', content: m.content })
+            c.push({
+              role: 'agent',
+              content: m.content,
+              elapsed_ms: m.elapsed_ms,
+              prompt_tokens: m.prompt_tokens,
+              completion_tokens: m.completion_tokens,
+              total_tokens: m.total_tokens,
+            })
           }
         }
         setConv(c)
@@ -302,7 +310,8 @@ export default function Workbench() {
         setStatusText('')
         // 收口：本次运行的汇总气泡整体转正为一条完整对话消息（无输出则不留空泡）
         const body = streamRef.current.trim()
-        if (body) setConv((c) => [...c, { role: 'agent', content: body }])
+        const meta = runMetaFromDone(d)
+        if (body) setConv((c) => [...c, { role: 'agent', content: body, ...meta }])
         streamRef.current = ''
         setStreamText('')
         setFsSignal((n) => n + 1)
@@ -704,6 +713,7 @@ export default function Workbench() {
             agentId={info?.agent?.id ?? null}
             onChangeAgent={(id) => void changeAgent(id)}
             agentSwitching={agentSwitching}
+            onNewSession={() => void createNewSession()}
           />
         </section>
       </div>

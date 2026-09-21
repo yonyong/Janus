@@ -2575,6 +2575,44 @@ body.wb-dragging .wb-split::after {
   color: var(--text-4);
 }
 
+/* Agent 答复底部：本轮耗时 / Token；超阈值红色警示 */
+.msg-run-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-size: var(--fs-xs);
+  color: var(--text-4);
+  line-height: 1.4;
+}
+
+.msg-run-meta.is-warn {
+  color: #cf1322;
+  border-top-color: rgba(207, 19, 34, 0.35);
+}
+
+.msg-run-meta-icon {
+  font-size: 12px;
+}
+
+.msg-run-meta-tip {
+  opacity: 0.9;
+}
+
+.msg-run-meta-tip::before {
+  content: '·';
+  margin-right: 6px;
+  opacity: 0.6;
+}
+
+.chat-session-hint {
+  margin: 8px 12px 0;
+  flex-shrink: 0;
+}
+
 @keyframes stream-caret-blink {
   50% {
     opacity: 0;
