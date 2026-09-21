@@ -72,7 +72,7 @@ export const acceptGeneratePrompt = (dir: string): string => {
     '- 把每条结果汇成 Markdown 表格（表头：用例 | 标题 | 结果 | 说明，结果列只能取 通过 / 失败 / 跳过 / 未执行）' +
     `写入 ${base}/arch/test-result.md；\n` +
     `- 脚本能被 \`python3 ${base}/usecase/accept.py\` 直接在项目根目录运行；脚本自身退出码 0 表示跑通` +
-    '（单条用例的成败以结果表为准）。不要修改用例清单本身。'
+    '（单条用例的成败以结果表为准）。诊断信息用普通 print，不要自行改 stdout 编码。不要修改用例清单本身。'
   )
 }
 
@@ -97,6 +97,10 @@ export const scriptAssistPrompt = (dir: string): string => {
     '2. 正文不要依赖 frontmatter（平台执行时会剥掉头部）；参数从命令行以 `--name value` 读取' +
     '（boolean 为 true/false 字符串）；\n' +
     '3. 脚本应能在项目根目录直接运行；写完后在回复里说明文件路径、参数含义与示例命令。\n' +
+    '4. 输出约定（平台会采集 stdout/stderr 写入 .runs）：用普通 print / echo / console.log，' +
+    '不要自行 reconfigure/强制 UTF-8 或改 stdout 编码（平台已注入 PYTHONUTF8，父子按 UTF-8 一致采集）；' +
+    '需要额外落盘时只写环境变量 JANUS_SCRIPT_LOG 指向的文件（UTF-8 追加），' +
+    '不要自猜项目根或 other/logs 路径。\n' +
     '注意：不要改动 usecase/accept.* 总验收脚本，那是用例验收专用入口。\n' +
     '\n' +
     '脚本名称：\n' +
