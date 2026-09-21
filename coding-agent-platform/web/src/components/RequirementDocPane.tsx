@@ -36,7 +36,7 @@ import {
   uploadRequirementAttachments,
 } from '../api'
 import { extOf } from '../chatAttachments'
-import RichText from './RichText'
+import AgentMarkdown from './AgentMarkdown'
 import VersionHistoryDrawer from './VersionHistoryDrawer'
 import FilePreview, { previewKindOf, hasPreviewMode } from './FileViewer'
 
@@ -413,7 +413,7 @@ export default function RequirementDocPane({
         {mode === 'preview' ? (
           <div className="doc-preview">
             {activeDoc.trim() ? (
-              <RichText text={activeDoc} />
+              <AgentMarkdown text={activeDoc} variant="doc" />
             ) : (
               <Typography.Text type="secondary">
                 （文档为空，切到「编辑」开始书写{tab === 'design' ? '，或在右侧对话里点「生成详细设计」' : ''}）

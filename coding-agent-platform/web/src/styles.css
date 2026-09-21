@@ -1084,8 +1084,99 @@ body.wb-dragging .wb-split::after {
   font-size: var(--fs-sm);
   line-height: 1.8;
   color: var(--text-1);
-  white-space: pre-wrap;
+  padding: 4px 2px;
 }
+
+/* 需求 / 详细设计文档预览（与 .fv-md 同级文档排版，无弹层高度限制） */
+.doc-md {
+  color: var(--text-1);
+  font-size: var(--fs-md);
+  line-height: 1.75;
+  word-break: break-word;
+}
+
+.doc-md > :first-child {
+  margin-top: 0;
+}
+
+.doc-md > :last-child {
+  margin-bottom: 0;
+}
+
+.doc-md h1,
+.doc-md h2,
+.doc-md h3,
+.doc-md h4 {
+  color: var(--text-1);
+  margin: 18px 0 10px;
+  line-height: 1.4;
+}
+
+.doc-md h1 { font-size: 20px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.doc-md h2 { font-size: 17px; }
+.doc-md h3 { font-size: 15px; }
+.doc-md h4 { font-size: 14px; }
+
+.doc-md p { margin: 8px 0; }
+
+.doc-md a { color: var(--primary); }
+
+.doc-md ul,
+.doc-md ol { padding-left: 22px; margin: 8px 0; }
+
+.doc-md li { margin: 2px 0; }
+
+.doc-md blockquote {
+  margin: 10px 0;
+  padding: 6px 14px;
+  border-left: 3px solid var(--brand-a);
+  background: var(--bg-hover);
+  color: var(--text-2);
+  border-radius: 0 6px 6px 0;
+}
+
+.doc-md code {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.doc-md pre {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow: auto;
+  margin: 8px 0;
+}
+
+.doc-md pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.doc-md table {
+  border-collapse: collapse;
+  margin: 10px 0;
+  font-size: var(--fs-xs);
+  width: 100%;
+}
+
+.doc-md th,
+.doc-md td {
+  border: 1px solid var(--border);
+  padding: 5px 12px;
+}
+
+.doc-md th { background: var(--bg-soft); font-weight: 600; }
+
+.doc-md img { max-width: 100%; border-radius: 6px; }
+
+.doc-md hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
 .doc-polish-loading {
   flex: none;
