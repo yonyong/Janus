@@ -792,7 +792,7 @@ export default function AdminConsole() {
   }
 
   return (
-    <div style={{ maxWidth: 1440, margin: '0 auto' }}>
+    <div style={{ width: '100%', maxWidth: 1440, margin: '0 auto' }}>
       <Card styles={{ body: { padding: '20px 24px' } }} style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
@@ -858,14 +858,14 @@ export default function AdminConsole() {
 
       <OverviewCards data={overview} known={!loadError} />
 
-      <Card>
+      <Card style={{ width: '100%' }}>
         <Tabs
           items={[
             {
               key: 'projects',
               label: `项目 ${loadError ? '—' : projects.length}`,
               children: (
-                <div>
+                <div style={{ width: '100%' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
                     <Button
                       danger
@@ -892,8 +892,8 @@ export default function AdminConsole() {
                       selectedRowKeys: selProjects,
                       onChange: (keys) => setSelProjects(keys as number[]),
                     }}
-                    style={{ maxWidth: 990 }}
-                    scroll={{ x: 970 }}
+                    style={{ width: '100%' }}
+                    scroll={{ x: true }}
                     pagination={{ ...LIST_PAGINATION }}
                     locale={{ emptyText: <Empty description={loadError ? '数据未加载成功，请点上方「重试」' : '暂无项目'} /> }}
                   />
@@ -904,7 +904,7 @@ export default function AdminConsole() {
               key: 'tokens',
               label: `令牌 ${loadError ? '—' : tokens.length}`,
               children: (
-                <div>
+                <div style={{ width: '100%' }}>
                   <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 12 }}>
                     <Button
                       danger
@@ -928,8 +928,8 @@ export default function AdminConsole() {
                       selectedRowKeys: selTokens,
                       onChange: (keys) => setSelTokens(keys as number[]),
                     }}
-                    style={{ maxWidth: 1140 }}
-                    scroll={{ x: 1120 }}
+                    style={{ width: '100%' }}
+                    scroll={{ x: true }}
                     pagination={{ ...LIST_PAGINATION }}
                     locale={{ emptyText: <Empty description={loadError ? '数据未加载成功，请点上方「重试」' : '暂无令牌'} /> }}
                   />
@@ -940,7 +940,7 @@ export default function AdminConsole() {
               key: 'sessions',
               label: `会话 ${loadError ? '—' : sessions.length}`,
               children: (
-                <div>
+                <div style={{ width: '100%' }}>
                   <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 12 }}>
                     <Button
                       danger
@@ -964,8 +964,8 @@ export default function AdminConsole() {
                       selectedRowKeys: selSessions,
                       onChange: (keys) => setSelSessions(keys as number[]),
                     }}
-                    style={{ maxWidth: 1070 }}
-                    scroll={{ x: 1050 }}
+                    style={{ width: '100%' }}
+                    scroll={{ x: true }}
                     pagination={{ ...LIST_PAGINATION }}
                     locale={{ emptyText: <Empty description={loadError ? '数据未加载成功，请点上方「重试」' : '暂无会话'} /> }}
                   />
