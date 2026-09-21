@@ -40,12 +40,15 @@ import {
   createCase,
   deleteCase,
   listAttachments,
+  readFile,
   runAcceptScript,
   updateCase,
   uploadCaseAttachments,
 } from '../api'
+import { extOf } from '../chatAttachments'
 import { acceptGeneratePrompt } from './FlowCommands'
 import RichText from './RichText'
+import FilePreview, { previewKindOf, hasPreviewMode } from './FileViewer'
 
 interface DraftState {
   mode: 'create' | 'edit'
@@ -73,6 +76,7 @@ const STATUS_TAG: Record<string, { color: string; label: string }> = {
  */
 export default function CasePane({
   token,
+  pid,
   rid,
   dir,
   cases,
@@ -84,6 +88,8 @@ export default function CasePane({
   refreshSignal = 0,
 }: {
   token: string | null
+  /** 项目 id：附件点击预览读文件时需要。 */
+  pid?: number | null
   rid: number | null
   /** 需求目录名（.janus/{dir}/…），用于总验收脚本指令与提示。 */
   dir: string
@@ -114,6 +120,7 @@ export default function CasePane({
   // 用例附件：case_id -> 附件列表；附件实体在项目工作区 .janus/ 下
   const [atts, setAtts] = useState<Record<number, Attachment[]>>({})
   const [attsUploading, setAttsUploading] = useState<number | null>(null)
+  const [preview, setPreview] = useState<{ path: string; ext: string; content: string; name: string } | null>(null)
 
   useEffect(() => {
     setDraft(null)
@@ -257,6 +264,26 @@ export default function CasePane({
       const info = describeError(e)
       message.error(`${info.title}${info.detail ? '：' + info.detail : ''}`)
     }
+  }
+
+  const openAttPreview = async (a: Attachment) => {
+    if (pid == null) {
+      message.warning('无法预览：缺少项目上下文')
+      return
+    }
+    const ext = extOf(a.filename)
+    const kind = previewKindOf(ext)
+    const binaryPreview =
+      kind === 'pdf' || kind === 'image' || kind === 'sheet' || kind === 'docx' || kind === 'office-legacy'
+    let content = ''
+    if (!binaryPreview) {
+      try {
+        content = (await readFile(token, pid, a.path)).content
+      } catch {
+        /* 读不到内容时仍打开预览 */
+      }
+    }
+    setPreview({ path: a.path, ext, content, name: a.filename })
   }
 
   const submitDraft = async () => {
@@ -619,7 +646,20 @@ export default function CasePane({
                       <div className="case-field-body">
                         <div className="case-atts">
                           {(atts[c.id] || []).map((a) => (
-                            <span className="case-att" key={a.id} title={a.path}>
+                            <span
+                              className="case-att case-att-clickable"
+                              key={a.id}
+                              title={pid == null ? a.path : `点击预览 · ${a.path}`}
+                              onClick={() => void openAttPreview(a)}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  void openAttPreview(a)
+                                }
+                              }}
+                            >
                               <PaperClipOutlined />
                               <span className="case-att-name">{a.filename}</span>
                               <Button
@@ -627,7 +667,10 @@ export default function CasePane({
                                 type="text"
                                 danger
                                 icon={<DeleteOutlined />}
-                                onClick={() => void removeAtt(a)}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  void removeAtt(a)
+                                }}
                               />
                             </span>
                           ))}
@@ -720,6 +763,27 @@ export default function CasePane({
         destroyOnHidden
       >
         <pre className="case-run-output">{runOut?.body}</pre>
+      </Modal>
+
+      <Modal
+        title={preview?.name}
+        open={!!preview}
+        onCancel={() => setPreview(null)}
+        footer={<a onClick={() => setPreview(null)}>关闭</a>}
+        width={860}
+        destroyOnHidden
+      >
+        {preview && pid != null && (
+          <div className="fv-stage">
+            {hasPreviewMode(preview.ext) ? (
+              <FilePreview pid={pid} token={token ?? null} path={preview.path} ext={preview.ext} content={preview.content} />
+            ) : (
+              <pre className="code-block" style={{ maxHeight: '58vh' }}>
+                {preview.content || '（空文件或内容不可预览）'}
+              </pre>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   )

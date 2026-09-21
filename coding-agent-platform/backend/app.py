@@ -30,7 +30,8 @@ from .models import (AgentCreate, AgentUpdate, AgentReorderIn, AgentTestIn, Proj
                      RequirementCreate,
                      TokenIssue, AdminTokenIssue, AdminTokenUpdate,
                      FileWriteIn, FileCreateIn, FileRenameIn,
-                     RequirementUpdate, StageIn, CaseIn, CaseBulkIn, CaseBatchDeleteIn, CaseUpdate,
+                     RequirementUpdate, StageIn, CaseIn, CaseBulkIn, CaseBatchDeleteIn, BatchIdsIn,
+                     CaseUpdate,
                      ArchiveIn, AiTaskIn, ScriptSaveIn, ScriptRunIn, SessionAgentIn,
                      STAGES, CASE_STATUSES, VERDICTS)
 from . import ai_tasks as AI
@@ -2229,6 +2230,29 @@ def admin_delete_project(pid: int, db: sqlite3.Connection = Depends(get_db),
     return {"ok": True}
 
 
+@app.post("/api/admin/projects/batch-delete")
+def admin_batch_delete_projects(body: BatchIdsIn, db: sqlite3.Connection = Depends(get_db),
+                                _ok=Depends(require_admin)):
+    """批量删除项目：先整批校验存在性，任一条不存在则整批不动。"""
+    ids = list(dict.fromkeys(body.ids or []))
+    if not ids:
+        raise HTTPException(status_code=400, detail="请先勾选要删除的项目")
+    rows = []
+    for pid in ids:
+        p = R.ProjectRepo.get(db, pid)
+        if p is None:
+            raise HTTPException(status_code=404, detail=f"项目 #{pid} 不存在")
+        rows.append(p)
+    for p in rows:
+        ctx = {"target_type": "project", "target_id": p["id"], "target_name": p["name"],
+               "project_id": p["id"], "project_name": p["name"],
+               "detail": {"disk_path": p["disk_path"], "from": "admin_console", "batch": True}}
+        with audit.guard("project.delete", **ctx):
+            R.ProjectRepo.delete(db, p["id"])
+        audit.log("project.delete", **ctx)
+    return {"deleted": len(rows)}
+
+
 @app.get("/api/admin/tokens")
 def admin_tokens(db: sqlite3.Connection = Depends(get_db), _ok=Depends(require_admin)):
     return [_token_row(t) for t in R.TokenRepo.list(db)]
@@ -2324,6 +2348,30 @@ def admin_revoke_token(tid: int, db: sqlite3.Connection = Depends(get_db),
     return {"ok": True}
 
 
+@app.post("/api/admin/tokens/batch-delete")
+def admin_batch_revoke_tokens(body: BatchIdsIn, db: sqlite3.Connection = Depends(get_db),
+                              _ok=Depends(require_admin)):
+    """批量吊销令牌：先整批校验存在性，任一条不存在则整批不动。"""
+    ids = list(dict.fromkeys(body.ids or []))
+    if not ids:
+        raise HTTPException(status_code=400, detail="请先勾选要吊销的令牌")
+    rows = []
+    for tid in ids:
+        t = R.TokenRepo.get(db, tid)
+        if t is None:
+            raise HTTPException(status_code=404, detail=f"令牌 #{tid} 不存在或已被吊销")
+        rows.append(t)
+    for t in rows:
+        ctx = {"target_type": "token", "target_id": t["id"],
+               "target_name": audit.mask_token(t.get("token") or ""),
+               "detail": {"note": t.get("note") or "", "project_ids": t.get("project_ids"),
+                          "batch": True}}
+        with audit.guard("token.revoke", **ctx):
+            R.TokenRepo.delete(db, t["id"])
+        audit.log("token.revoke", **ctx)
+    return {"deleted": len(rows)}
+
+
 @app.get("/api/admin/agents")
 def admin_agents(db: sqlite3.Connection = Depends(get_db), _ok=Depends(require_admin)):
     return _agents_enriched(db)
@@ -2345,6 +2393,58 @@ def admin_sessions(db: sqlite3.Connection = Depends(get_db), _ok=Depends(require
         d["messages"] = _count(db, "SELECT COUNT(*) FROM messages WHERE session_id=?", (r["id"],))
         out.append(d)
     return out
+
+
+@app.delete("/api/admin/sessions/{sid}")
+def admin_delete_session(sid: int, db: sqlite3.Connection = Depends(get_db),
+                         _ok=Depends(require_admin)):
+    s = R.SessionRepo.get(db, sid)
+    if s is None:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    req = R.RequirementRepo.get(db, s["requirement_id"]) if s.get("requirement_id") else None
+    proj = R.ProjectRepo.get(db, s["project_id"]) if s.get("project_id") else None
+    ctx = {
+        "target_type": "session", "target_id": sid,
+        "target_name": (req or {}).get("title") or f"会话 #{sid}",
+        "project_id": s.get("project_id"),
+        "project_name": (proj or {}).get("name") or "",
+        "detail": {"requirement_id": s.get("requirement_id"), "git_branch": s.get("git_branch"),
+                   "from": "admin_console"},
+    }
+    with audit.guard("session.delete", **ctx):
+        R.SessionRepo.delete(db, sid)
+    audit.log("session.delete", **ctx)
+    return {"ok": True}
+
+
+@app.post("/api/admin/sessions/batch-delete")
+def admin_batch_delete_sessions(body: BatchIdsIn, db: sqlite3.Connection = Depends(get_db),
+                                _ok=Depends(require_admin)):
+    """批量删除会话：先整批校验存在性，任一条不存在则整批不动。"""
+    ids = list(dict.fromkeys(body.ids or []))
+    if not ids:
+        raise HTTPException(status_code=400, detail="请先勾选要删除的会话")
+    rows = []
+    for sid in ids:
+        s = R.SessionRepo.get(db, sid)
+        if s is None:
+            raise HTTPException(status_code=404, detail=f"会话 #{sid} 不存在")
+        rows.append(s)
+    for s in rows:
+        req = R.RequirementRepo.get(db, s["requirement_id"]) if s.get("requirement_id") else None
+        proj = R.ProjectRepo.get(db, s["project_id"]) if s.get("project_id") else None
+        ctx = {
+            "target_type": "session", "target_id": s["id"],
+            "target_name": (req or {}).get("title") or f"会话 #{s['id']}",
+            "project_id": s.get("project_id"),
+            "project_name": (proj or {}).get("name") or "",
+            "detail": {"requirement_id": s.get("requirement_id"), "git_branch": s.get("git_branch"),
+                       "from": "admin_console", "batch": True},
+        }
+        with audit.guard("session.delete", **ctx):
+            R.SessionRepo.delete(db, s["id"])
+        audit.log("session.delete", **ctx)
+    return {"deleted": len(rows)}
 
 
 # ---------------- 审计：操作日志 / Agent 调用留痕 ----------------

@@ -28,6 +28,7 @@ import {
 } from 'antd'
 import {
   CopyOutlined,
+  DeleteOutlined,
   EditOutlined,
   EyeOutlined,
   KeyOutlined,
@@ -43,8 +44,12 @@ import {
   AdminSession,
   AdminToken,
   ErrorInfo,
+  adminBatchDeleteProjects,
+  adminBatchDeleteSessions,
+  adminBatchRevokeTokens,
   adminCreateProject,
   adminDeleteProject,
+  adminDeleteSession,
   adminIssueToken,
   adminListProjects,
   adminListSessions,
@@ -193,7 +198,7 @@ function ErrorGuide({
 /** 管理台：项目 / 令牌 / 会话 的统一管理入口，需管理员口令解锁。 */
 export default function AdminConsole() {
   const navigate = useNavigate()
-  const { message } = AntdApp.useApp()
+  const { message, modal } = AntdApp.useApp()
 
   const [enabled, setEnabled] = useState<boolean | null>(null)
   // 管理员口令统一由全局登录态持有：这里解锁/锁定写的就是登录弹框用的那一份凭证，
@@ -210,6 +215,11 @@ export default function AdminConsole() {
   const [loadError, setLoadError] = useState<ErrorInfo | null>(null)
   const [stateError, setStateError] = useState<ErrorInfo | null>(null)
   const [unlockError, setUnlockError] = useState<string | null>(null)
+  // 三个 Tab 各自的勾选批量删除
+  const [selProjects, setSelProjects] = useState<number[]>([])
+  const [selTokens, setSelTokens] = useState<number[]>([])
+  const [selSessions, setSelSessions] = useState<number[]>([])
+  const [batchBusy, setBatchBusy] = useState(false)
 
   const [createOpen, setCreateOpen] = useState(false)
   const [editProjectOpen, setEditProjectOpen] = useState(false)
@@ -263,6 +273,9 @@ export default function AdminConsole() {
       setProjects(ps)
       setTokens(ts)
       setSessions(ss)
+      setSelProjects([])
+      setSelTokens([])
+      setSelSessions([])
     } catch (e) {
       const info = describeError(e)
       setLoadError(info)
@@ -459,6 +472,88 @@ export default function AdminConsole() {
     }
   }
 
+  const removeSession = async (id: number) => {
+    try {
+      await adminDeleteSession(id)
+      message.success('已删除')
+      loadAll()
+    } catch (e) {
+      message.error(describeError(e).message)
+    }
+  }
+
+  const confirmBatchProjects = () => {
+    if (!selProjects.length) return
+    const n = selProjects.length
+    modal.confirm({
+      title: `删除选中的 ${n} 个项目？`,
+      content: '删除后不可撤销，相关需求与会话数据也会一并失去入口。',
+      okText: '删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        setBatchBusy(true)
+        try {
+          const r = await adminBatchDeleteProjects(selProjects)
+          message.success(`已删除 ${r.deleted} 个项目`)
+          await loadAll()
+        } catch (e) {
+          message.error(describeError(e).message)
+        } finally {
+          setBatchBusy(false)
+        }
+      },
+    })
+  }
+
+  const confirmBatchTokens = () => {
+    if (!selTokens.length) return
+    const n = selTokens.length
+    modal.confirm({
+      title: `吊销选中的 ${n} 个令牌？`,
+      content: '持有者将立即失去访问权。',
+      okText: '吊销',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        setBatchBusy(true)
+        try {
+          const r = await adminBatchRevokeTokens(selTokens)
+          message.success(`已吊销 ${r.deleted} 个令牌`)
+          await loadAll()
+        } catch (e) {
+          message.error(describeError(e).message)
+        } finally {
+          setBatchBusy(false)
+        }
+      },
+    })
+  }
+
+  const confirmBatchSessions = () => {
+    if (!selSessions.length) return
+    const n = selSessions.length
+    modal.confirm({
+      title: `删除选中的 ${n} 个会话？`,
+      content: '会话消息与关联改动记录会一并清除，不可撤销。',
+      okText: '删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        setBatchBusy(true)
+        try {
+          const r = await adminBatchDeleteSessions(selSessions)
+          message.success(`已删除 ${r.deleted} 个会话`)
+          await loadAll()
+        } catch (e) {
+          message.error(describeError(e).message)
+        } finally {
+          setBatchBusy(false)
+        }
+      },
+    })
+  }
+
   const openIssue = (defaultIds?: number[]) => {
     setIssueResult(null)
     setIssueMode('7')
@@ -620,16 +715,30 @@ export default function AdminConsole() {
     { title: '创建时间', dataIndex: 'created_at', width: 160, render: (v: string | null) => <span style={{ fontSize: 12 }}>{v || '—'}</span> },
     {
       title: '操作',
-      width: 100,
+      width: 140,
       render: (_: any, r: AdminSession) => (
-        <Button
-          type="link"
-          size="small"
-          icon={<ThunderboltOutlined />}
-          onClick={() => navigate(`/workbench/${r.id}?pid=${r.project_id ?? ''}&rid=${r.requirement_id ?? ''}`)}
-        >
-          打开
-        </Button>
+        <Space size={0}>
+          <Button
+            type="link"
+            size="small"
+            icon={<ThunderboltOutlined />}
+            onClick={() => navigate(`/workbench/${r.id}?pid=${r.project_id ?? ''}&rid=${r.requirement_id ?? ''}`)}
+          >
+            打开
+          </Button>
+          <Popconfirm
+            title="删除该会话？"
+            description="消息与关联改动记录会一并清除"
+            okText="删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => removeSession(r.id)}
+          >
+            <Button type="link" size="small" danger>
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
       ),
     },
   ]
@@ -757,7 +866,16 @@ export default function AdminConsole() {
               label: `项目 ${loadError ? '—' : projects.length}`,
               children: (
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                    <Button
+                      danger
+                      icon={<DeleteOutlined />}
+                      disabled={!selProjects.length}
+                      loading={batchBusy}
+                      onClick={confirmBatchProjects}
+                    >
+                      删除选中{selProjects.length ? `（${selProjects.length}）` : ''}
+                    </Button>
                     <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
                       新建项目
                     </Button>
@@ -770,6 +888,10 @@ export default function AdminConsole() {
                     loading={loading}
                     dataSource={projects}
                     columns={projectColumns}
+                    rowSelection={{
+                      selectedRowKeys: selProjects,
+                      onChange: (keys) => setSelProjects(keys as number[]),
+                    }}
                     style={{ maxWidth: 990 }}
                     scroll={{ x: 970 }}
                     pagination={{ ...LIST_PAGINATION }}
@@ -782,38 +904,72 @@ export default function AdminConsole() {
               key: 'tokens',
               label: `令牌 ${loadError ? '—' : tokens.length}`,
               children: (
-                <Table
-                  rowKey="id"
-                  size="small"
-                  className="tbl-nowrap"
-                  tableLayout="fixed"
-                  loading={loading}
-                  dataSource={tokens}
-                  columns={tokenColumns}
-                  style={{ maxWidth: 1140 }}
-                  scroll={{ x: 1120 }}
-                  pagination={{ ...LIST_PAGINATION }}
-                  locale={{ emptyText: <Empty description={loadError ? '数据未加载成功，请点上方「重试」' : '暂无令牌'} /> }}
-                />
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 12 }}>
+                    <Button
+                      danger
+                      icon={<DeleteOutlined />}
+                      disabled={!selTokens.length}
+                      loading={batchBusy}
+                      onClick={confirmBatchTokens}
+                    >
+                      吊销选中{selTokens.length ? `（${selTokens.length}）` : ''}
+                    </Button>
+                  </div>
+                  <Table
+                    rowKey="id"
+                    size="small"
+                    className="tbl-nowrap"
+                    tableLayout="fixed"
+                    loading={loading}
+                    dataSource={tokens}
+                    columns={tokenColumns}
+                    rowSelection={{
+                      selectedRowKeys: selTokens,
+                      onChange: (keys) => setSelTokens(keys as number[]),
+                    }}
+                    style={{ maxWidth: 1140 }}
+                    scroll={{ x: 1120 }}
+                    pagination={{ ...LIST_PAGINATION }}
+                    locale={{ emptyText: <Empty description={loadError ? '数据未加载成功，请点上方「重试」' : '暂无令牌'} /> }}
+                  />
+                </div>
               ),
             },
             {
               key: 'sessions',
               label: `会话 ${loadError ? '—' : sessions.length}`,
               children: (
-                <Table
-                  rowKey="id"
-                  size="small"
-                  className="tbl-nowrap"
-                  tableLayout="fixed"
-                  loading={loading}
-                  dataSource={sessions}
-                  columns={sessionColumns}
-                  style={{ maxWidth: 1030 }}
-                  scroll={{ x: 1010 }}
-                  pagination={{ ...LIST_PAGINATION }}
-                  locale={{ emptyText: <Empty description={loadError ? '数据未加载成功，请点上方「重试」' : '暂无会话'} /> }}
-                />
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 12 }}>
+                    <Button
+                      danger
+                      icon={<DeleteOutlined />}
+                      disabled={!selSessions.length}
+                      loading={batchBusy}
+                      onClick={confirmBatchSessions}
+                    >
+                      删除选中{selSessions.length ? `（${selSessions.length}）` : ''}
+                    </Button>
+                  </div>
+                  <Table
+                    rowKey="id"
+                    size="small"
+                    className="tbl-nowrap"
+                    tableLayout="fixed"
+                    loading={loading}
+                    dataSource={sessions}
+                    columns={sessionColumns}
+                    rowSelection={{
+                      selectedRowKeys: selSessions,
+                      onChange: (keys) => setSelSessions(keys as number[]),
+                    }}
+                    style={{ maxWidth: 1070 }}
+                    scroll={{ x: 1050 }}
+                    pagination={{ ...LIST_PAGINATION }}
+                    locale={{ emptyText: <Empty description={loadError ? '数据未加载成功，请点上方「重试」' : '暂无会话'} /> }}
+                  />
+                </div>
               ),
             },
           ]}

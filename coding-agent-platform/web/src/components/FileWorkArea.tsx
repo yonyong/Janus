@@ -170,6 +170,7 @@ export default function FileWorkArea({
         {cat === 'cases' && (
           <CasePane
             token={token}
+            pid={pid}
             rid={rid}
             dir={requirement?.dir_name || ''}
             cases={cases}

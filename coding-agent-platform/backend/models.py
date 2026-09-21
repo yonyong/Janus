@@ -150,6 +150,11 @@ class CaseBatchDeleteIn(BaseModel):
     ids: list[int] = []
 
 
+class BatchIdsIn(BaseModel):
+    """管理台批量删除：ids 必须非空；先整批校验再动手。"""
+    ids: list[int] = []
+
+
 class CaseUpdate(BaseModel):
     title: str | None = None
     steps: str | None = None

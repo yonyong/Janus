@@ -535,6 +535,22 @@ class SessionRepo:
         conn.execute("UPDATE sessions SET cli_session_id=? WHERE id=?", (external_id, sid))
         conn.commit()
 
+    @staticmethod
+    def delete(conn, sid):
+        """删除会话及其消息、关联改动集（含文件明细）。不存在则返回 False。"""
+        if SessionRepo.get(conn, sid) is None:
+            return False
+        conn.execute("DELETE FROM messages WHERE session_id=?", (sid,))
+        cs_ids = [r[0] for r in conn.execute(
+            "SELECT id FROM change_sets WHERE session_id=?", (sid,)).fetchall()]
+        for csid in cs_ids:
+            conn.execute("DELETE FROM change_files WHERE change_set_id=?", (csid,))
+        if cs_ids:
+            conn.execute("DELETE FROM change_sets WHERE session_id=?", (sid,))
+        conn.execute("DELETE FROM sessions WHERE id=?", (sid,))
+        conn.commit()
+        return True
+
 
 class MessageRepo:
     @staticmethod

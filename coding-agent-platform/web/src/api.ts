@@ -1330,6 +1330,13 @@ export const adminCreateProject = (body: { name: string; disk_path: string }) =>
 export const adminDeleteProject = (pid: number) =>
   req(adminUrl(`/api/admin/projects/${pid}`), { method: 'DELETE' }) as Promise<any>
 
+export const adminBatchDeleteProjects = (ids: number[]) =>
+  req(adminUrl('/api/admin/projects/batch-delete'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  }) as Promise<{ deleted: number }>
+
 /** 管理台编辑项目信息：只提交要改的字段，未提交的保持原值。 */
 export const adminUpdateProject = (pid: number, body: { name?: string; disk_path?: string }) =>
   req(adminUrl(`/api/admin/projects/${pid}`), {
@@ -1365,6 +1372,13 @@ export const adminIssueToken = (body: IssueTokenBody) =>
 export const adminRevokeToken = (id: number) =>
   req(adminUrl(`/api/admin/tokens/${id}`), { method: 'DELETE' }) as Promise<any>
 
+export const adminBatchRevokeTokens = (ids: number[]) =>
+  req(adminUrl('/api/admin/tokens/batch-delete'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  }) as Promise<{ deleted: number }>
+
 /** 查看已签发令牌的完整原文：签发后随时可读，而不只在签发成功的那一次可见。 */
 export const adminRevealToken = (id: number) =>
   req(adminUrl(`/api/admin/tokens/${id}/reveal`)) as Promise<AdminToken>
@@ -1390,6 +1404,16 @@ export const adminListAgents = () =>
 
 export const adminListSessions = () =>
   req(adminUrl('/api/admin/sessions')) as Promise<AdminSession[]>
+
+export const adminDeleteSession = (sid: number) =>
+  req(adminUrl(`/api/admin/sessions/${sid}`), { method: 'DELETE' }) as Promise<any>
+
+export const adminBatchDeleteSessions = (ids: number[]) =>
+  req(adminUrl('/api/admin/sessions/batch-delete'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  }) as Promise<{ deleted: number }>
 
 // ---------------- 审计：操作日志 ----------------
 
@@ -1441,6 +1465,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'changeset.revert_file': '回退单个文件',
   'session.create': '创建会话',
   'session.abort': '中止运行',
+  'session.delete': '删除会话',
 }
 
 export const auditActionLabel = (action: string) => AUDIT_ACTION_LABELS[action] || action
