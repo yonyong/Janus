@@ -186,7 +186,7 @@ def test_archive_requires_valid_verdict():
 
 
 def test_delete_requirement_checks_access():
-    """删除需求此前没有任何鉴权，任何拿到接口地址的人都能删；现已按项目令牌校验。"""
+    """删除需求需项目权限；越权 403。管理员守卫由路由表 require_admin 覆盖。"""
     conn = _db()
     _, rid, allowed = _fixture(conn)
     try:

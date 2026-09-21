@@ -571,8 +571,9 @@ def create_requirement(pid: int, body: RequirementCreate,
 
 @app.delete("/api/requirements/{rid}")
 def delete_requirement(rid: int, allowed: set = Depends(get_allowed),
-                       db: sqlite3.Connection = Depends(get_db)):
-    # 业务需求动作：持有效访问令牌的业务人员可用，无需管理员口令。
+                       db: sqlite3.Connection = Depends(get_db),
+                       _ok=Depends(require_admin)):
+    # 删除需求仅管理员可操作（与新建需求一致）；业务令牌不可删。
     req = _require_requirement(db, rid, allowed)
     proj = R.ProjectRepo.get(db, req["project_id"])
     ctx = {"target_type": "requirement", "target_id": rid, "target_name": req["title"],

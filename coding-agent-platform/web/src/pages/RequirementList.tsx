@@ -271,19 +271,21 @@ export default function RequirementList() {
                     </div>
                   }
                   extra={
-                    <Dropdown
-                      trigger={['click']}
-                      menu={{
-                        items: [
-                          { key: 'del', icon: <DeleteOutlined />, label: '删除需求', danger: true },
-                        ],
-                        onClick: ({ key }) => {
-                          if (key === 'del') confirmDelete(r)
-                        },
-                      }}
-                    >
-                      <Button type="text" size="small" icon={<MoreOutlined />} />
-                    </Dropdown>
+                    isAdmin ? (
+                      <Dropdown
+                        trigger={['click']}
+                        menu={{
+                          items: [
+                            { key: 'del', icon: <DeleteOutlined />, label: '删除需求', danger: true },
+                          ],
+                          onClick: ({ key }) => {
+                            if (key === 'del') confirmDelete(r)
+                          },
+                        }}
+                      >
+                        <Button type="text" size="small" icon={<MoreOutlined />} />
+                      </Dropdown>
+                    ) : undefined
                   }
                   actions={[
                     <Button
