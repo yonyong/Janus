@@ -92,12 +92,64 @@ export function useThemeMode() {
 export function buildAntdTheme(mode: ThemeMode): ThemeConfig {
   const meta = THEMES.find((t) => t.id === mode) || THEMES[0]
   const base = feishuTheme
+  const darkBtn = meta.dark
+    ? {
+        defaultBg: 'rgba(255,255,255,0.06)',
+        defaultHoverBg: 'rgba(255,255,255,0.1)',
+        defaultActiveBg: 'rgba(255,255,255,0.14)',
+        defaultBorderColor: 'rgba(255,255,255,0.12)',
+        defaultHoverBorderColor: '#5b8cff',
+        defaultActiveBorderColor: '#7aa2ff',
+        defaultColor: 'rgba(230,232,235,0.82)',
+        defaultHoverColor: '#5b8cff',
+        defaultActiveColor: '#7aa2ff',
+        defaultShadow: 'none',
+        primaryShadow: 'none',
+        /* 压低 darkAlgorithm 默认的近白 solid，避免误用时整块发白 */
+        solidTextColor: '#e6e8eb',
+      }
+    : {
+        primaryShadow: 'none',
+      }
+
+  const darkSolid =
+    meta.dark
+      ? {
+          colorBgSolid: 'rgba(255,255,255,0.12)',
+          colorBgSolidHover: 'rgba(255,255,255,0.18)',
+          colorBgSolidActive: 'rgba(255,255,255,0.24)',
+        }
+      : {}
+
+  const darkMenu = meta.dark
+    ? {
+        itemSelectedBg: mode === 'slate' ? '#1e2c4d' : '#1f2b45',
+        itemSelectedColor: '#5b8cff',
+        itemHoverBg: mode === 'slate' ? '#273657' : '#2b313d',
+        itemActiveBg: mode === 'slate' ? '#1e2c4d' : '#1f2b45',
+      }
+    : mode === 'paper'
+      ? {
+          itemSelectedBg: '#e3efe6',
+          itemSelectedColor: '#2f7d5b',
+          itemHoverBg: '#ede4cf',
+        }
+      : {}
+
   return {
     ...base,
     algorithm: meta.dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
-    token: { ...base.token, ...ANTD_TOKENS[mode] },
+    token: { ...base.token, ...ANTD_TOKENS[mode], ...darkSolid },
     components: {
       ...base.components,
+      Button: {
+        ...(base.components?.Button || {}),
+        ...darkBtn,
+      },
+      Menu: {
+        ...(base.components?.Menu || {}),
+        ...darkMenu,
+      },
       // 暗系下让 Layout 的头/侧/底跟随容器色，避免亮色算法遗留的白条
       Layout: {
         ...(base.components?.Layout || {}),
