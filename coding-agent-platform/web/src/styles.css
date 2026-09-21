@@ -35,6 +35,16 @@
   --bg-hover: #eef1f5;
   /* 下沉表面：代码块 / 输入框 / diff 等，比页面更沉一档 */
   --bg-sunken: #e3e6ea;
+  /* 对话井：比面板更沉；Agent 气泡浮在其上，避免与面板同色「糊成一片」 */
+  --bg-chat: #e3e6ea;
+  --bg-bubble: #ffffff;
+  --shadow-bubble: 0 2px 10px rgba(31, 35, 41, 0.07);
+  /* 暗色默认按钮的软填充（避免纯白底突兀）；亮色沿用容器色 */
+  --btn-default-bg: #ffffff;
+  --btn-default-bg-hover: #f7f8fa;
+  --btn-default-bg-active: #eff0f3;
+  --btn-default-border: #d0d3d9;
+  --btn-default-text: #1f2329;
   /* 状态浅底（胶囊 / 高亮），暗色下会调深 */
   --tint-primary: #eef4ff;
   --tint-primary-border: #d4e2ff;
@@ -71,6 +81,14 @@
   --bg-soft: #f3ecdb;
   --bg-hover: #ede4cf;
   --bg-sunken: #e2d9c2;
+  --bg-chat: #ddd4bc;
+  --bg-bubble: #fdfaf3;
+  --shadow-bubble: 0 2px 12px rgba(90, 74, 40, 0.1);
+  --btn-default-bg: #fdfaf3;
+  --btn-default-bg-hover: #f3ecdb;
+  --btn-default-bg-active: #ede4cf;
+  --btn-default-border: #cfc5ae;
+  --btn-default-text: #3a352c;
   --tint-primary: #e3efe6;
   --tint-primary-border: #cfe4d3;
   --tint-success: #e3efe0;
@@ -107,6 +125,16 @@
   --bg-soft: #272c37;
   --bg-hover: #2b313d;
   --bg-sunken: #0a0b0f;
+  /* 对话井更深；气泡比面板再抬一档，避免与 --bg-elevated 面板同色 */
+  --bg-chat: #12141a;
+  --bg-bubble: #2a303b;
+  --shadow-bubble: 0 4px 18px rgba(0, 0, 0, 0.42);
+  /* 软填充替代近白实底，降低暗色下的刺眼对比 */
+  --btn-default-bg: rgba(255, 255, 255, 0.06);
+  --btn-default-bg-hover: rgba(255, 255, 255, 0.1);
+  --btn-default-bg-active: rgba(255, 255, 255, 0.14);
+  --btn-default-border: rgba(255, 255, 255, 0.12);
+  --btn-default-text: rgba(230, 232, 235, 0.82);
   --tint-primary: #1f2b45;
   --tint-primary-border: #2f4066;
   --tint-success: #16301f;
@@ -142,6 +170,14 @@
   --bg-soft: #22304c;
   --bg-hover: #273657;
   --bg-sunken: #060a14;
+  --bg-chat: #0c1426;
+  --bg-bubble: #2a3a58;
+  --shadow-bubble: 0 4px 20px rgba(0, 0, 0, 0.48);
+  --btn-default-bg: rgba(226, 232, 245, 0.07);
+  --btn-default-bg-hover: rgba(226, 232, 245, 0.12);
+  --btn-default-bg-active: rgba(226, 232, 245, 0.16);
+  --btn-default-border: rgba(226, 232, 245, 0.14);
+  --btn-default-text: rgba(226, 232, 245, 0.84);
   --tint-primary: #1e2c4d;
   --tint-primary-border: #33456e;
   --tint-success: #12321f;
@@ -172,6 +208,43 @@
 .theme-switch-btn:hover {
   color: var(--primary);
   background: var(--bg-hover);
+}
+
+/* 默认按钮：跟 CSS 变量走，暗色用软填充而非近白实底 */
+.ant-btn.ant-btn-variant-outlined.ant-btn-color-default,
+.ant-btn.ant-btn-variant-dashed.ant-btn-color-default {
+  background: var(--btn-default-bg);
+  border-color: var(--btn-default-border);
+  color: var(--btn-default-text);
+  box-shadow: none;
+}
+
+.ant-btn.ant-btn-variant-outlined.ant-btn-color-default:not(:disabled):not(.ant-btn-disabled):hover,
+.ant-btn.ant-btn-variant-dashed.ant-btn-color-default:not(:disabled):not(.ant-btn-disabled):hover {
+  background: var(--btn-default-bg-hover);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.ant-btn.ant-btn-variant-outlined.ant-btn-color-default:not(:disabled):not(.ant-btn-disabled):active,
+.ant-btn.ant-btn-variant-dashed.ant-btn-color-default:not(:disabled):not(.ant-btn-disabled):active {
+  background: var(--btn-default-bg-active);
+  border-color: var(--primary-deep);
+  color: var(--primary-deep);
+}
+
+/* 暗色下若出现 default solid（近白底），压成同系软填充，避免刺眼白块 */
+:root[data-theme='dark'] .ant-btn.ant-btn-variant-solid.ant-btn-color-default,
+:root[data-theme='slate'] .ant-btn.ant-btn-variant-solid.ant-btn-color-default {
+  background: var(--btn-default-bg-hover);
+  border-color: transparent;
+  color: var(--btn-default-text);
+}
+
+:root[data-theme='dark'] .ant-btn.ant-btn-variant-solid.ant-btn-color-default:not(:disabled):not(.ant-btn-disabled):hover,
+:root[data-theme='slate'] .ant-btn.ant-btn-variant-solid.ant-btn-color-default:not(:disabled):not(.ant-btn-disabled):hover {
+  background: var(--btn-default-bg-active);
+  color: var(--text-1);
 }
 
 .theme-opt {
@@ -2442,6 +2515,8 @@ body.wb-dragging .wb-split::after {
   min-height: 0;
   overflow: auto;
   padding: 16px;
+  /* 相对面板下沉一档，让 Agent 气泡能「浮」起来 */
+  background: var(--bg-chat);
 }
 
 .bubble-row {
@@ -2465,16 +2540,17 @@ body.wb-dragging .wb-split::after {
 }
 
 .bubble-agent {
-  background: var(--bg-elevated);
+  background: var(--bg-bubble);
   border: 1px solid var(--border);
   border-top-left-radius: 4px;
-  box-shadow: 0 2px 8px rgba(31, 35, 41, 0.04);
+  box-shadow: var(--shadow-bubble);
 }
 
 .bubble-me {
   background: linear-gradient(135deg, var(--primary), #4e83fd);
   color: #fff;
   border-top-right-radius: 4px;
+  box-shadow: var(--shadow-sm);
 }
 
 /* 流式输出时正文末尾的打字光标 */
@@ -4427,7 +4503,8 @@ pre.diff {
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--bg);
+  background: var(--bg-soft);
+  box-shadow: var(--shadow-sm);
 }
 
 .script-row-main {
