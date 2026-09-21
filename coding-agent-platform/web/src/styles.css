@@ -2658,8 +2658,8 @@ body.wb-dragging .wb-split::after {
 }
 
 .chat-session-hint-action:hover:not(:disabled) {
-  background: #e4edff;
-  border-color: #c2d4ff;
+  background: var(--bg-hover);
+  border-color: var(--primary);
 }
 
 .chat-session-hint-action:disabled {
