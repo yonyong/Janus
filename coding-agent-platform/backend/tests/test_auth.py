@@ -84,3 +84,18 @@ def test_admin_verify_checks_password():
                 raise AssertionError(f"{bad!r} 不该通过管理员校验")
     finally:
         CONFIG.admin_token = old
+
+
+def test_create_requirement_route_requires_admin():
+    """新建需求仅管理员可调用：与新建项目同一套 require_admin 守卫。
+
+    路由函数直接调用会绕过 FastAPI 依赖注入，因此检查路由表本身。
+    """
+    def deps_of(path: str, method: str):
+        for r in A.app.routes:
+            if getattr(r, "path", None) == path and method in (getattr(r, "methods", None) or set()):
+                return [d.call for d in r.dependant.dependencies]
+        raise AssertionError(f"未找到路由 {method} {path}")
+
+    assert A.require_admin in deps_of("/api/projects/{pid}/requirements", "POST")
+    assert A.require_admin in deps_of("/api/projects", "POST")

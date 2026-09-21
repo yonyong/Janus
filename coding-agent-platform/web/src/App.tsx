@@ -63,8 +63,16 @@ const TITLES: { match: (p: string) => boolean; text: string; sub: string }[] = [
   { match: (p) => p.startsWith('/workbench'), text: '编码工作台', sub: '需求 · 设计 · 编码 · 测试' },
 ]
 
-/** 仅管理员可访问的审计页；非管理员直接给出说明，不再去打必然 401 的接口。 */
-function AdminOnly({ children }: { children: React.ReactNode }) {
+/** 仅管理员可访问的页面；非管理员给出说明，避免去打必然 401 的接口。 */
+function AdminOnly({
+  children,
+  title = '该页面仅管理员可见',
+  description = '请用管理员口令登录后再访问。',
+}: {
+  children: React.ReactNode
+  title?: string
+  description?: string
+}) {
   const { isAdmin, openLogin } = useAuth()
   if (isAdmin) return <>{children}</>
   return (
@@ -80,10 +88,8 @@ function AdminOnly({ children }: { children: React.ReactNode }) {
       }}
     >
       <AuditOutlined style={{ fontSize: 40, color: '#c9cdd4' }} />
-      <div style={{ fontSize: 15, color: '#646a73' }}>操作日志与 Token 审计仅管理员可见</div>
-      <div style={{ fontSize: 13, color: '#8f959e' }}>
-        这两个页面记录全平台的敏感操作与 Agent 调用明细，请用管理员口令登录后查看。
-      </div>
+      <div style={{ fontSize: 15, color: '#646a73' }}>{title}</div>
+      <div style={{ fontSize: 13, color: '#8f959e' }}>{description}</div>
       <Button type="primary" onClick={() => openLogin('admin')} style={{ marginTop: 6 }}>
         管理员登录
       </Button>
@@ -164,13 +170,26 @@ function Shell() {
       <Route path="/projects" element={<ProjectList />} />
       <Route path="/projects/:pid" element={<RequirementList />} />
       <Route path="/workbench/:sid" element={<Workbench />} />
-      <Route path="/agents" element={<AgentList />} />
+      <Route
+        path="/agents"
+        element={
+          <AdminOnly
+            title="Agent 管理仅管理员可见"
+            description="注册与配置编码 Agent 需要管理员口令，请切换身份后再访问。"
+          >
+            <AgentList />
+          </AdminOnly>
+        }
+      />
       <Route path="/logs" element={<LogViewer />} />
       <Route path="/admin" element={<AdminConsole />} />
       <Route
         path="/audit/logs"
         element={
-          <AdminOnly>
+          <AdminOnly
+            title="操作日志仅管理员可见"
+            description="该页面记录全平台的敏感操作明细，请用管理员口令登录后查看。"
+          >
             <AuditLogs />
           </AdminOnly>
         }
@@ -178,7 +197,10 @@ function Shell() {
       <Route
         path="/audit/tokens"
         element={
-          <AdminOnly>
+          <AdminOnly
+            title="Token 审计仅管理员可见"
+            description="该页面记录 Agent 调用的入参、出参与用量，请用管理员口令登录后查看。"
+          >
             <TokenAudit />
           </AdminOnly>
         }

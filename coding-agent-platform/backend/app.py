@@ -545,7 +545,8 @@ def list_requirements(pid: int, allowed: set = Depends(get_allowed),
 @app.post("/api/projects/{pid}/requirements")
 def create_requirement(pid: int, body: RequirementCreate,
                        allowed: set = Depends(get_allowed),
-                       db: sqlite3.Connection = Depends(get_db)):
+                       db: sqlite3.Connection = Depends(get_db),
+                       _ok=Depends(require_admin)):
     if pid not in allowed:
         raise HTTPException(status_code=403, detail="无权访问该项目")
     # 工作流模式：标准(full)四阶段照旧；轻量(lite)跳过澄清与用例，直接进编码实现

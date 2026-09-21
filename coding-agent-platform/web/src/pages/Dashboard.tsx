@@ -140,10 +140,19 @@ export default function Dashboard() {
         <Col xs={24} lg={16}>
           <Card title="快捷入口" styles={{ header: { borderBottom: '1px solid #f2f3f5' } }}>
             <div className="quick-grid">
-              <QuickEntry icon={<FolderOutlined />} title="项目空间" desc="管理工程与授权" onClick={() => navigate('/projects')} />
-              <QuickEntry icon={<RobotOutlined />} title="Agent 管理" desc="注册编码 Agent" onClick={() => navigate('/agents')} />
-              <QuickEntry icon={<PlusOutlined />} title="新建项目" desc="挂载本地工程" onClick={() => navigate('/projects?new=1')} />
-              <QuickEntry icon={<LinkOutlined />} title="分享与授权" desc="签发访问链接" onClick={() => navigate('/projects')} />
+              <QuickEntry
+                icon={<FolderOutlined />}
+                title="项目空间"
+                desc={isAdmin ? '管理工程与授权' : '查看已授权工程'}
+                onClick={() => navigate('/projects')}
+              />
+              {isAdmin && (
+                <>
+                  <QuickEntry icon={<RobotOutlined />} title="Agent 管理" desc="注册编码 Agent" onClick={() => navigate('/agents')} />
+                  <QuickEntry icon={<PlusOutlined />} title="新建项目" desc="挂载本地工程" onClick={() => navigate('/projects?new=1')} />
+                  <QuickEntry icon={<LinkOutlined />} title="分享与授权" desc="签发访问链接" onClick={() => navigate('/projects')} />
+                </>
+              )}
             </div>
           </Card>
 

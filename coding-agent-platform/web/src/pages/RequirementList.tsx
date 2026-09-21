@@ -25,7 +25,7 @@ import {
   PlusOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons'
-import { useToken } from '../auth'
+import { useToken, useAuth } from '../auth'
 import { useSearch } from '../context'
 import {
   createRequirement,
@@ -68,6 +68,7 @@ export default function RequirementList() {
   const { pid } = useParams()
   const projectId = Number(pid)
   const token = useToken()
+  const { isAdmin } = useAuth()
   const navigate = useNavigate()
   const { kw } = useSearch()
   const { message, modal } = AntdApp.useApp()
@@ -208,9 +209,11 @@ export default function RequirementList() {
             <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/projects')}>
               返回
             </Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-              新建需求
-            </Button>
+            {isAdmin && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+                新建需求
+              </Button>
+            )}
           </Space>
         </div>
       </Card>
@@ -227,8 +230,8 @@ export default function RequirementList() {
         </Row>
       ) : visible.length === 0 ? (
         <Card styles={{ body: { padding: '48px 24px' } }}>
-          <Empty description={kw ? '没有匹配的需求' : '还没有需求，写下第一条，让创意落地生花'}>
-            {!kw && (
+          <Empty description={kw ? '没有匹配的需求' : isAdmin ? '还没有需求，写下第一条，让创意落地生花' : '还没有需求'}>
+            {!kw && isAdmin && (
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
                 新建需求
               </Button>
