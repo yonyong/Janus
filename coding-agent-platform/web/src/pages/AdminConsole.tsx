@@ -361,7 +361,11 @@ export default function AdminConsole() {
   /** 编辑项目信息：名称与本地工程路径。路径改动会立即影响该项目的文件面板与 agent 工作目录。 */
   const openEditProject = (p: AdminProject) => {
     setEditProjectTarget(p)
-    editProjectForm.setFieldsValue({ name: p.name, disk_path: p.disk_path })
+    editProjectForm.setFieldsValue({
+      name: p.name,
+      disk_path: p.disk_path,
+      log_dir: p.log_dir || '',
+    })
     setEditProjectOpen(true)
   }
 
@@ -370,13 +374,18 @@ export default function AdminConsole() {
     const v = await editProjectForm.validateFields()
     const name = (v.name || '').trim()
     const disk_path = (v.disk_path || '').trim()
-    if (name === editProjectTarget.name && disk_path === editProjectTarget.disk_path) {
+    const log_dir = (v.log_dir || '').trim() || null
+    if (
+      name === editProjectTarget.name &&
+      disk_path === editProjectTarget.disk_path &&
+      (log_dir || null) === (editProjectTarget.log_dir || null)
+    ) {
       setEditProjectOpen(false)
       return
     }
     setEditProjectSaving(true)
     try {
-      await adminUpdateProject(editProjectTarget.id, { name, disk_path })
+      await adminUpdateProject(editProjectTarget.id, { name, disk_path, log_dir })
       message.success('项目已更新')
       setEditProjectOpen(false)
       loadAll()
@@ -1020,6 +1029,18 @@ export default function AdminConsole() {
             extra="保存后立即生效：该项目的文件面板、代码 diff 与会话工作目录都会指向新路径"
           >
             <FolderPathInput placeholder="D:/dev/my-project" />
+          </Form.Item>
+          <Form.Item
+            name="log_dir"
+            label="日志目录"
+            extra="相对工程路径的子目录；留空表示未配置"
+          >
+            <FolderPathInput
+              placeholder="例如 logs"
+              rootPath={editProjectForm.getFieldValue('disk_path') || editProjectTarget?.disk_path}
+              relative
+              pickerTitle="选择项目内日志目录"
+            />
           </Form.Item>
         </Form>
       </Modal>

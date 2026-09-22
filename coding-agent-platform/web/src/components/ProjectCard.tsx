@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import { Button, Card, Popconfirm, Space, Tooltip, Typography } from 'antd'
-import { DeleteOutlined, FolderOpenOutlined, LinkOutlined, RightOutlined } from '@ant-design/icons'
+import { DeleteOutlined, FolderOpenOutlined, LinkOutlined, RightOutlined, SettingOutlined } from '@ant-design/icons'
 import type { Project } from '../api'
 
 type FolderVariant = 'windows' | 'mac' | 'brand'
@@ -54,11 +54,13 @@ export default function ProjectCard({
   project,
   onOpen,
   onShare,
+  onSettings,
   onDelete,
 }: {
   project: Project
   onOpen: () => void
   onShare?: () => void
+  onSettings?: () => void
   onDelete?: () => void
 }) {
   return (
@@ -112,6 +114,11 @@ export default function ProjectCard({
         onClick={(e) => e.stopPropagation()}
       >
         <Space size={2}>
+          {onSettings && (
+            <Button size="small" type="text" icon={<SettingOutlined />} onClick={onSettings} className="tile-ghost-btn">
+              设置
+            </Button>
+          )}
           {onShare && (
             <Button size="small" type="text" icon={<LinkOutlined />} onClick={onShare} className="tile-ghost-btn">
               分享
