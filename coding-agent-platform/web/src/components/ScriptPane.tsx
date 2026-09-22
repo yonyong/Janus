@@ -444,7 +444,9 @@ export default function ScriptPane({
               <div key={it.name} className="script-row">
                 <div className="script-row-main">
                   <div className="script-row-title">
-                    <CodeOutlined />
+                    <span className="script-row-icon" aria-hidden>
+                      <CodeOutlined />
+                    </span>
                     <span className="script-row-name">{it.display_name || it.name}</span>
                     <span className="script-row-file">{it.name}</span>
                   </div>
