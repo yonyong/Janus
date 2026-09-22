@@ -35,7 +35,7 @@ def test_session_flow():
         user_msgs = [m for m in msgs if m["role"] == "user"]
         assert len(user_msgs) == 1, "用户消息不应重复写入（否则会双改盘/双落库）"
 
-        # 不同 message 应新建独立 run（不能静默丢弃第二条消息）
+        # 不同 message 应新建独立 run（须等上一条完成；进行中时会被单飞闸门拒绝）
         mode3, rid3 = S.SessionService.resolve_run(conn, s["id"], "另一句话")
         assert mode3 == "new"
         assert rid3 != rid
@@ -45,6 +45,67 @@ def test_session_flow():
         # 第二条完成后再重连同样走 replay
         mode4, rid4 = S.SessionService.resolve_run(conn, s["id"], "另一句话")
         assert mode4 == "replay"
+
+    asyncio.run(run())
+    conn.close()
+
+
+def test_session_single_flight_rejects_other_message_while_busy():
+    """同一会话进行中时，另一条消息不得新建并行 run（跨机器同 URL 提问闸门）。
+
+    同一 message 仍应走 live 续传；中止或跑完后才允许新消息。
+    """
+    AgentRegistry.register("slow-abortable", _SlowAdapter())
+    conn = get_conn(); init_db(conn)
+    d = tempfile.mkdtemp()
+    ag = R.AgentRepo.create(conn, "slow-busy", "slow-abortable", {})
+    p = R.ProjectRepo.create(conn, "busy-proj", d)
+    rq = R.RequirementRepo.create(conn, p["id"], "t", "")
+
+    async def run():
+        s = S.SessionService.create(conn, rq["id"], agent_id=ag["id"])
+        mode, rid = S.SessionService.resolve_run(conn, s["id"], "先跑这个")
+        assert mode == "new"
+
+        # 读到首个 delta，确认仍在进行中
+        async for e in S.SessionService.stream_run(rid):
+            if e.get("type") == "delta":
+                break
+        assert S.SessionService.active_run_for_session(s["id"])[0] == rid
+
+        # 另一端发不同文案：必须拒绝，且不得再落一条用户消息
+        before = R.MessageRepo.list_by_session(conn, s["id"])
+        try:
+            S.SessionService.resolve_run(conn, s["id"], "另一端的提问")
+            assert False, "进行中应抛 SessionBusyError"
+        except S.SessionBusyError as e:
+            assert e.active_run_id == rid
+            assert e.active_message == "先跑这个"
+        after = R.MessageRepo.list_by_session(conn, s["id"])
+        assert len(after) == len(before), "被拒提问不得落库用户消息"
+        assert S.SessionService.active_run_for_session(s["id"])[0] == rid
+
+        # 同一 message 续传仍可用
+        mode_live, rid_live = S.SessionService.resolve_run(conn, s["id"], "先跑这个")
+        assert mode_live == "live"
+        assert rid_live == rid
+
+        # 中止后应允许新消息
+        S.SessionService.abort_run(s["id"])
+        async for _ in S.SessionService.stream_run(rid):
+            pass
+        for _ in range(80):
+            if S.SessionService.active_run_for_session(s["id"])[0] is None:
+                break
+            await asyncio.sleep(0.05)
+        assert S.SessionService.active_run_for_session(s["id"])[0] is None
+
+        mode2, rid2 = S.SessionService.resolve_run(conn, s["id"], "另一端的提问")
+        assert mode2 == "new"
+        assert rid2 != rid
+        S.SessionService.abort_run(s["id"])
+        async for _ in S.SessionService.stream_run(rid2):
+            pass
 
     asyncio.run(run())
     conn.close()
