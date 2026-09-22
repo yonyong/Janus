@@ -21,6 +21,7 @@ from . import session_service as S
 from . import diff as D
 from . import docs as WD
 from . import files as FS
+from . import project_logs as PL
 from . import snapshots as SN
 from . import test_report as TR
 from . import acceptance as ACC
@@ -431,10 +432,16 @@ def create_project(body: ProjectCreate, db: sqlite3.Connection = Depends(get_db)
                   detail={"disk_path": body.disk_path},
                   error=f"磁盘路径不存在或不是目录: {body.disk_path}")
         raise HTTPException(status_code=400, detail=f"磁盘路径不存在或不是目录: {body.disk_path}")
-    out = R.ProjectRepo.create(db, body.name, body.disk_path)
+    log_dir = None
+    if body.log_dir is not None and str(body.log_dir).strip():
+        try:
+            log_dir = PL.normalize_log_dir(body.disk_path, body.log_dir)
+        except PL.ProjectLogError as e:
+            raise HTTPException(status_code=e.code, detail=e.message)
+    out = R.ProjectRepo.create(db, body.name, body.disk_path, log_dir=log_dir)
     audit.log("project.create", target_type="project", target_id=out["id"],
               target_name=out["name"], project_id=out["id"], project_name=out["name"],
-              detail={"disk_path": out["disk_path"]})
+              detail={"disk_path": out["disk_path"], "log_dir": out.get("log_dir")})
     return out
 
 
@@ -447,7 +454,7 @@ def list_projects(allowed: set = Depends(get_allowed), db: sqlite3.Connection = 
 @app.patch("/api/admin/projects/{pid}")
 def update_project(pid: int, body: ProjectUpdate, db: sqlite3.Connection = Depends(get_db),
                    _ok=Depends(require_admin)):
-    """编辑项目信息（名称 / 本地磁盘路径）。
+    """编辑项目信息（名称 / 本地磁盘路径 / 日志目录）。
 
     两个路径指向同一份实现：管理台沿用 /api/admin/* 前缀（与 admin 的增删一致），
     业务侧沿用 /api/projects/*。逻辑只有一份，避免两处校验各自漂移。
@@ -464,6 +471,7 @@ def update_project(pid: int, body: ProjectUpdate, db: sqlite3.Connection = Depen
             raise HTTPException(status_code=400, detail="项目名称不能为空")
         name = body.name.strip()[:100]
     disk_path = R.UNSET
+    effective_disk = before["disk_path"]
     if body.disk_path is not None:
         path = body.disk_path.strip()
         if not os.path.isdir(path):
@@ -472,9 +480,20 @@ def update_project(pid: int, body: ProjectUpdate, db: sqlite3.Connection = Depen
                       detail={"disk_path": path}, error=f"磁盘路径不存在或不是目录: {path}")
             raise HTTPException(status_code=400, detail=f"磁盘路径不存在或不是目录: {path}")
         disk_path = path
-    out = R.ProjectRepo.update(db, pid, name=name, disk_path=disk_path)
-    changed = {k: {"from": before[k], "to": out[k]} for k in ("name", "disk_path")
-               if before[k] != out[k]}
+        effective_disk = path
+    log_dir = R.UNSET
+    if "log_dir" in body.model_fields_set:
+        raw = body.log_dir
+        if raw is None or not str(raw).strip():
+            log_dir = None
+        else:
+            try:
+                log_dir = PL.normalize_log_dir(effective_disk, str(raw))
+            except PL.ProjectLogError as e:
+                raise HTTPException(status_code=e.code, detail=e.message)
+    out = R.ProjectRepo.update(db, pid, name=name, disk_path=disk_path, log_dir=log_dir)
+    changed = {k: {"from": before.get(k), "to": out.get(k)} for k in ("name", "disk_path", "log_dir")
+               if before.get(k) != out.get(k)}
     if changed:
         audit.log("project.update", target_type="project", target_id=pid, target_name=out["name"],
                   project_id=pid, project_name=out["name"], detail=changed)
@@ -1955,6 +1974,137 @@ async def stream_project_logs(pid: int, after_seq: int = Query(0),
             # 心跳注释行：让代理/浏览器知道连接还活着，也确保事件循环得到让出机会
             yield ": keep-alive\n\n"
             await asyncio.sleep(LOG_POLL_SECONDS)
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
+
+
+# ---------------- 项目磁盘日志（log_dir 下的文件 tail / SSE） ----------------
+
+DISK_LOG_POLL_SECONDS = 0.6
+
+
+def _project_log_root(db: sqlite3.Connection, pid: int, allowed: set) -> tuple[dict, str | None]:
+    """返回 (project, log_root_abs|None)；权限不足抛 HTTPException。"""
+    if pid not in allowed:
+        raise HTTPException(status_code=403, detail="无权访问该项目")
+    proj = R.ProjectRepo.get(db, pid)
+    if proj is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    try:
+        root = PL.resolve_log_root(proj["disk_path"], proj.get("log_dir"))
+    except PL.ProjectLogError as e:
+        raise HTTPException(status_code=e.code, detail=e.message)
+    return proj, root
+
+
+@app.get("/api/projects/{pid}/log-files")
+def list_project_log_files(pid: int, allowed: set = Depends(get_allowed),
+                           db: sqlite3.Connection = Depends(get_db)):
+    """列出项目已配置日志目录下的候选文件。"""
+    proj, root = _project_log_root(db, pid, allowed)
+    configured = bool((proj.get("log_dir") or "").strip())
+    if not configured or root is None:
+        return {"log_dir_configured": False, "log_dir": None, "files": []}
+    try:
+        files = PL.list_log_files(root)
+    except PL.ProjectLogError as e:
+        raise HTTPException(status_code=e.code, detail=e.message)
+    return {"log_dir_configured": True, "log_dir": proj.get("log_dir"), "files": files}
+
+
+@app.get("/api/projects/{pid}/log-files/content")
+def read_project_log_file(pid: int, path: str = Query(...),
+                          offset: int | None = Query(None),
+                          tail: bool = Query(False),
+                          max_bytes: int = Query(PL.MAX_CHUNK),
+                          allowed: set = Depends(get_allowed),
+                          db: sqlite3.Connection = Depends(get_db)):
+    """按字节偏移读取日志文件增量；offset 省略且 tail=true 时从文件尾部回看。"""
+    _proj, root = _project_log_root(db, pid, allowed)
+    if root is None:
+        raise HTTPException(status_code=400, detail="管理员尚未设置项目日志目录")
+    try:
+        return PL.read_log_chunk(root, path, offset, max_bytes=max_bytes,
+                                 tail=tail or offset is None)
+    except PL.ProjectLogError as e:
+        raise HTTPException(status_code=e.code, detail=e.message)
+
+
+@app.get("/api/projects/{pid}/log-files/stream")
+async def stream_project_log_file(pid: int, path: str = Query(...),
+                                  after_offset: int | None = Query(None),
+                                  token: str = Query(None), admin: str = Query(None)):
+    """SSE：实时推送某个磁盘日志文件的新增内容。"""
+
+    def chunk(payload: dict) -> str:
+        return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+    async def gen():
+        conn = get_conn()
+        try:
+            allowed = resolve_access(conn, token, admin)
+            if allowed is None:
+                async for y in _sse_error("无效或缺失访问令牌"):
+                    yield y
+                return
+            try:
+                proj, root = _project_log_root(conn, pid, allowed)
+            except HTTPException as e:
+                async for y in _sse_error(str(e.detail)):
+                    yield y
+                return
+        finally:
+            conn.close()
+
+        if root is None:
+            async for y in _sse_error("管理员尚未设置项目日志目录"):
+                yield y
+            return
+
+        yield chunk({
+            "type": "hello",
+            "project_id": pid,
+            "project": (proj or {}).get("name") or f"项目 #{pid}",
+            "path": path,
+            "log_dir": (proj or {}).get("log_dir"),
+        })
+
+        # 首包：未指定 after_offset 时发尾部；否则从该偏移续读
+        offset = after_offset
+        try:
+            if offset is None:
+                first = PL.read_log_chunk(root, path, None, tail=True)
+                yield chunk({"type": "chunk", **first})
+                offset = first["next_offset"]
+            else:
+                offset = int(offset)
+        except PL.ProjectLogError as e:
+            yield chunk({"type": "error", "text": e.message})
+            return
+
+        while True:
+            try:
+                part = PL.read_log_chunk(root, path, offset, max_bytes=PL.MAX_CHUNK, tail=False)
+            except PL.ProjectLogError as e:
+                yield chunk({"type": "reset", "text": e.message})
+                await asyncio.sleep(DISK_LOG_POLL_SECONDS)
+                continue
+            if part.get("reset"):
+                yield chunk({"type": "reset", "text": "日志文件已被截断或轮转，请重新加载",
+                             "size": part.get("size")})
+                # 从新文件尾部重新开始
+                try:
+                    first = PL.read_log_chunk(root, path, None, tail=True)
+                    yield chunk({"type": "chunk", **first})
+                    offset = first["next_offset"]
+                except PL.ProjectLogError as e:
+                    yield chunk({"type": "error", "text": e.message})
+                    return
+            elif part.get("content"):
+                yield chunk({"type": "chunk", **part})
+                offset = part["next_offset"]
+            yield ": keep-alive\n\n"
+            await asyncio.sleep(DISK_LOG_POLL_SECONDS)
 
     return StreamingResponse(gen(), media_type="text/event-stream")
 

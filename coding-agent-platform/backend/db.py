@@ -20,7 +20,9 @@ CREATE TABLE IF NOT EXISTS agents(
 CREATE TABLE IF NOT EXISTS projects(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
-  disk_path TEXT NOT NULL
+  disk_path TEXT NOT NULL,
+  -- 项目磁盘下的日志子目录（相对 disk_path）；空表示未配置
+  log_dir TEXT
 );
 CREATE TABLE IF NOT EXISTS requirements(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -250,6 +252,8 @@ _MIGRATIONS = [
     ("messages", "prompt_tokens", "INTEGER"),
     ("messages", "completion_tokens", "INTEGER"),
     ("messages", "total_tokens", "INTEGER"),
+    # 项目磁盘日志目录（相对 disk_path）
+    ("projects", "log_dir", "TEXT"),
 ]
 
 
