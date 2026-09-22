@@ -5164,13 +5164,13 @@ pre.diff {
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
   color: var(--text-3);
   background: var(--bg-soft);
   border: 1px solid var(--border-light);
-  font-size: 14px;
+  font-size: 13px;
   transition:
     color 0.22s ease,
     background 0.22s ease,
