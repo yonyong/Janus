@@ -4,16 +4,26 @@ import type { AuxTab } from './FileWorkArea'
 
 export type AuxMode = 'docked' | 'popup'
 
+/** left / right 至少填一个；只填一个时副屏为全屏单栏。 */
 export interface AuxScreenInstance {
   id: string
-  left: AuxTab
-  right: AuxTab
+  left: AuxTab | null
+  right: AuxTab | null
   mode: AuxMode
   minimized?: boolean
   label?: string
 }
 
 const STORAGE_PREFIX = 'janus.aux.'
+
+const TAB_LABEL: Record<string, string> = {
+  req: '需求',
+  code: 'Files',
+  script: '脚本',
+  logs: '日志',
+  cases: '用例',
+  arch: '归档',
+}
 
 export function newAuxId(): string {
   return `aux-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
@@ -40,32 +50,27 @@ export function loadAuxSnapshot(auxId: string): (AuxScreenInstance & { sid?: num
   }
 }
 
-export function auxLabel(inst: { left: string; right: string }, index?: number): string {
-  const map: Record<string, string> = {
-    req: '需求',
-    code: 'Files',
-    script: '脚本',
-    logs: '日志',
-    cases: '用例',
-    arch: '归档',
-  }
-  const body = `${map[inst.left] || inst.left} | ${map[inst.right] || inst.right}`
+export function auxLabel(
+  inst: { left?: AuxTab | string | null; right?: AuxTab | string | null },
+  index?: number,
+): string {
+  const parts = [inst.left, inst.right]
+    .filter((t): t is string => !!t)
+    .map((t) => TAB_LABEL[t] || t)
+  const body = parts.length ? parts.join(' | ') : '空'
   return index != null ? `副屏${index + 1} · ${body}` : body
 }
 
 export function buildAuxPopupUrl(sid: number, auxId: string, q: {
   pid: number
   rid?: number | null
-  left: AuxTab
-  right: AuxTab
+  left: AuxTab | null
+  right: AuxTab | null
 }): string {
-  const u = new URL(window.location.href)
-  u.hash = `#/workbench/${sid}/aux/${auxId}`
-  // hash router: put query after hash path
   const params = new URLSearchParams()
   params.set('pid', String(q.pid))
   if (q.rid != null) params.set('rid', String(q.rid))
-  params.set('left', q.left)
-  params.set('right', q.right)
-  return `${u.origin}${u.pathname}${u.search}#/workbench/${sid}/aux/${auxId}?${params.toString()}`
+  if (q.left) params.set('left', q.left)
+  if (q.right) params.set('right', q.right)
+  return `${window.location.origin}${window.location.pathname}${window.location.search}#/workbench/${sid}/aux/${auxId}?${params.toString()}`
 }

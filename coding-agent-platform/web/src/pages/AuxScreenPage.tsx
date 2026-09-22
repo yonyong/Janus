@@ -22,7 +22,7 @@ import {
 import ProjectSettingsModal from '../components/ProjectSettingsModal'
 
 /**
- * 副屏弹出页：左右各一个业务 tab，不含 Agent 对话。
+ * 副屏弹出页：左右各一业务 tab（可只填一侧全屏单栏），不含 Agent 对话。
  * 路由：/#/workbench/:sid/aux/:auxId?pid=&rid=&left=&right=
  */
 export default function AuxScreenPage() {
@@ -34,8 +34,16 @@ export default function AuxScreenPage() {
   const { message } = AntdApp.useApp()
 
   const snap = auxId ? loadAuxSnapshot(auxId) : null
-  const [left, setLeft] = useState<AuxTab>((params.get('left') as AuxTab) || snap?.left || 'code')
-  const [right, setRight] = useState<AuxTab>((params.get('right') as AuxTab) || snap?.right || 'logs')
+  const parseTab = (raw: string | null | undefined): AuxTab | null => {
+    const v = (raw || '').trim()
+    if (!v) return null
+    return v as AuxTab
+  }
+  // URL / snapshot 显式缺省时保持 null（单栏）；两者都空再兜底 code
+  const initLeft = parseTab(params.get('left')) ?? parseTab(snap?.left ?? null)
+  const initRight = parseTab(params.get('right')) ?? parseTab(snap?.right ?? null)
+  const [left, setLeft] = useState<AuxTab | null>(initLeft ?? (initRight ? null : 'code'))
+  const [right, setRight] = useState<AuxTab | null>(initRight)
   const [requirement, setRequirement] = useState<Requirement | null>(null)
   const [flow, setFlow] = useState<WorkflowState | null>(null)
   const [cases, setCases] = useState<TestCase[]>([])

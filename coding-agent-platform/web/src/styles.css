@@ -5419,6 +5419,9 @@ textarea.script-edit-source {
   min-height: 0;
   display: flex;
 }
+.aux-dock-body.is-single .aux-half {
+  flex: 1;
+}
 .aux-half {
   flex: 1;
   min-width: 0;
