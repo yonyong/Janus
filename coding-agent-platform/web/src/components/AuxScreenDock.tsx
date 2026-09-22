@@ -33,10 +33,12 @@ type PaneCtx = {
 function AuxHalf({
   value,
   onChange,
+  allowClear,
   ctx,
 }: {
   value: AuxTab
-  onChange: (v: AuxTab) => void
+  onChange: (v: AuxTab | null) => void
+  allowClear?: boolean
   ctx: PaneCtx
 }) {
   return (
@@ -46,8 +48,9 @@ function AuxHalf({
           size="small"
           style={{ minWidth: 110 }}
           value={value}
+          allowClear={allowClear}
           options={AUX_TAB_OPTIONS}
-          onChange={onChange}
+          onChange={(v) => onChange((v as AuxTab) || null)}
         />
       </div>
       <div className="aux-half-body">
@@ -57,9 +60,67 @@ function AuxHalf({
   )
 }
 
+function AuxBody({
+  left,
+  right,
+  onLeft,
+  onRight,
+  ctx,
+}: {
+  left: AuxTab | null
+  right: AuxTab | null
+  onLeft: (v: AuxTab | null) => void
+  onRight: (v: AuxTab | null) => void
+  ctx: PaneCtx
+}) {
+  const dual = !!(left && right)
+  // 单栏：只展示有值的那一侧，全屏
+  if (!dual) {
+    const side: 'left' | 'right' = left ? 'left' : 'right'
+    const value = (left || right) as AuxTab
+    return (
+      <div className="aux-dock-body is-single">
+        <AuxHalf
+          value={value}
+          allowClear={false}
+          onChange={(v) => {
+            if (!v) return
+            if (side === 'left') onLeft(v)
+            else onRight(v)
+          }}
+          ctx={ctx}
+        />
+      </div>
+    )
+  }
+  return (
+    <div className="aux-dock-body">
+      <AuxHalf
+        value={left!}
+        allowClear
+        onChange={(v) => {
+          // 清空左侧 → 变为右侧单栏
+          onLeft(v)
+        }}
+        ctx={ctx}
+      />
+      <div className="aux-dock-split" />
+      <AuxHalf
+        value={right!}
+        allowClear
+        onChange={(v) => {
+          onRight(v)
+        }}
+        ctx={ctx}
+      />
+    </div>
+  )
+}
+
 /**
  * 钉在工作台的副屏：
  * - 展开时接近全屏（盖住主工作区），底部始终保留副屏标签条
+ * - 单 tab 全屏单栏；双 tab 左右分栏
  * - 点标签可唤出；点已激活标签再次最小化
  */
 export default function AuxScreenDock({
@@ -74,7 +135,6 @@ export default function AuxScreenDock({
   onChange: (id: string, patch: Partial<AuxScreenInstance>) => void
   onClose: (id: string) => void
   onToggleMinimize: (id: string) => void
-  /** 点未激活标签：展开该副屏（并收起其它展开的） */
   onActivate: (id: string) => void
   ctx: PaneCtx
 }) {
@@ -109,23 +169,23 @@ export default function AuxScreenDock({
               />
             </Space>
           </div>
-          <div className="aux-dock-body">
-            <AuxHalf
-              value={inst.left}
-              onChange={(left) => onChange(inst.id, { left })}
-              ctx={ctx}
-            />
-            <div className="aux-dock-split" />
-            <AuxHalf
-              value={inst.right}
-              onChange={(right) => onChange(inst.id, { right })}
-              ctx={ctx}
-            />
-          </div>
+          <AuxBody
+            left={inst.left}
+            right={inst.right}
+            onLeft={(left) => {
+              // 禁止左右都清空
+              if (!left && !inst.right) return
+              onChange(inst.id, { left })
+            }}
+            onRight={(right) => {
+              if (!inst.left && !right) return
+              onChange(inst.id, { right })
+            }}
+            ctx={ctx}
+          />
         </div>
       ))}
 
-      {/* 底部标签始终展示：再次点击已激活标签可最小化 */}
       <div className="aux-chip-bar">
         {docked.map((inst, i) => {
           const active = !inst.minimized
@@ -146,7 +206,7 @@ export default function AuxScreenDock({
   )
 }
 
-/** 弹出页内的左右副屏壳。 */
+/** 弹出页内的左右副屏壳（同样支持单栏全屏）。 */
 export function AuxScreenFrame({
   left,
   right,
@@ -155,10 +215,10 @@ export function AuxScreenFrame({
   title,
   ctx,
 }: {
-  left: AuxTab
-  right: AuxTab
-  onLeft: (v: AuxTab) => void
-  onRight: (v: AuxTab) => void
+  left: AuxTab | null
+  right: AuxTab | null
+  onLeft: (v: AuxTab | null) => void
+  onRight: (v: AuxTab | null) => void
   title: string
   ctx: PaneCtx
 }) {
@@ -170,11 +230,19 @@ export function AuxScreenFrame({
           关闭
         </Button>
       </div>
-      <div className="aux-popup-body">
-        <AuxHalf value={left} onChange={onLeft} ctx={ctx} />
-        <div className="aux-dock-split" />
-        <AuxHalf value={right} onChange={onRight} ctx={ctx} />
-      </div>
+      <AuxBody
+        left={left}
+        right={right}
+        onLeft={(v) => {
+          if (!v && !right) return
+          onLeft(v)
+        }}
+        onRight={(v) => {
+          if (!left && !v) return
+          onRight(v)
+        }}
+        ctx={ctx}
+      />
     </div>
   )
 }
