@@ -1727,6 +1727,8 @@ async def stream_events(
     - 同一 (sid, message) 复用同一 run；run 在后台执行，断线不杀死 agent，重连订阅同一流，
       不会重复调 agent（避免重复改盘/落库）。
     - 已完成运行的重连从 DB 回放，亦不重复调 agent。
+    - 会话单飞：已有进行中 run 时，另一条消息会收到 code=session_busy 的 error 事件并关闭流，
+      不会并行启动第二个 agent（跨机器同 URL 提问的权威闸门）。
     - 令牌与项目权限在该连接的每一请求上校验。
     """
     async def gen():
@@ -1759,8 +1761,20 @@ async def stream_events(
                         yield y
                     return
             proj = R.ProjectRepo.get(conn, sess["project_id"])
-            mode, run_id = S.SessionService.resolve_run(
-                conn, sid, message, actor=audit.identify(conn, token, admin))
+            try:
+                mode, run_id = S.SessionService.resolve_run(
+                    conn, sid, message, actor=audit.identify(conn, token, admin))
+            except S.SessionBusyError as e:
+                async for y in _sse_error(
+                    str(e),
+                    code="session_busy",
+                    extra={
+                        "active_run_id": e.active_run_id,
+                        "active_message": e.active_message,
+                    },
+                ):
+                    yield y
+                return
         finally:
             conn.close()
 
@@ -1855,9 +1869,17 @@ async def abort_session_run(sid: int, db: sqlite3.Connection = Depends(get_db),
     return {"aborted": run_id is not None, "run_id": run_id, "message": message}
 
 
-async def _sse_error(text):
-    """错误事件后追加 done，使客户端及时关闭流（避免 EventSource 自动重连空转）。"""
-    yield f"data: {json.dumps({'type': 'error', 'text': text}, ensure_ascii=False)}\n\n"
+async def _sse_error(text, code=None, extra=None):
+    """错误事件后追加 done，使客户端及时关闭流（避免 EventSource 自动重连空转）。
+
+    ``code`` / ``extra`` 供前端区分可恢复业务错误（如 session_busy）与普通失败。
+    """
+    payload = {"type": "error", "text": text}
+    if code:
+        payload["code"] = code
+    if extra:
+        payload.update(extra)
+    yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
     yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
 
 

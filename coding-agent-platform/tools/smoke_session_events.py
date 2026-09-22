@@ -59,7 +59,7 @@ class SlowAdapter:
 
     type = "slow-stub"
 
-    async def invoke(self, agent_row, message, project_path):
+    async def invoke(self, agent_row, message, project_path, resume_id=None):
         # 与真实适配器（codebuddy）一致：status 带 transient 标记，只推流不落库
         yield AgentEvent(type="status", pane="message", text="slow agent 开始处理",
                          payload={"transient": True})
@@ -75,7 +75,7 @@ class AbortableAdapter:
 
     type = "abort-stub"
 
-    async def invoke(self, agent_row, message, project_path):
+    async def invoke(self, agent_row, message, project_path, resume_id=None):
         yield AgentEvent(type="delta", pane="message", text="开始")
         for _ in range(600):
             await asyncio.sleep(0.5)
@@ -113,7 +113,7 @@ try:
     pid = proj["id"]
     st, tok = call("POST", f"/api/projects/{pid}/issue-token", {"admin": ADMIN}, {"project_ids": [pid]})
     tk = tok["token"]
-    st, req = call("POST", f"/api/projects/{pid}/requirements", {"token": tk},
+    st, req = call("POST", f"/api/projects/{pid}/requirements", {"admin": ADMIN},
                    {"title": "流式续传需求", "description": ""})
     check("建需求", st, 200)
     rid = req["id"]
@@ -221,6 +221,19 @@ try:
     time.sleep(0.2)
     st, out = call("GET", f"/api/sessions/{sid2}/active-run", {"token": tk})
     check("长任务确在后台运行", (st, out["active"]), (200, True))
+
+    # 会话单飞：另一端用不同文案提问必须被拒（SSE error + session_busy），且不落库
+    OTHER = "另一端同时提问"
+    qp_other = urllib.parse.urlencode({"message": OTHER, "token": tk})
+    busy_events = read_events_until(
+        f"{s.base}/api/sessions/{sid2}/events?{qp_other}", "error", max_seconds=10)
+    err = next((e for e in busy_events if e.get("type") == "error"), None)
+    check("并发提问收到 error", err is not None, True)
+    check("error.code 为 session_busy", (err or {}).get("code"), "session_busy")
+    check("带回进行中的原始消息", (err or {}).get("active_message"), MSG2)
+    st, msgs_busy = call("GET", f"/api/sessions/{sid2}/messages", {"token": tk})
+    check("被拒提问不落库",
+          sum(1 for m in msgs_busy if m["role"] == "user" and m["content"] == OTHER), 0)
 
     st, out = call("POST", f"/api/sessions/{sid2}/abort", {"token": tk})
     check("中止接口返回成功", (st, out["aborted"]), (200, True))

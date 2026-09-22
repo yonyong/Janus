@@ -1122,7 +1122,8 @@ export const sessionMessages = (token: string | null, sid: number) =>
   req(buildUrl(`/api/sessions/${sid}/messages`, token)) as Promise<Message[]>
 
 /** 会话当前是否有仍在后台进行的 agent 运行；有则返回触发它的原始消息。
- *  页面刷新后 SSE 连接已断，靠它重新订阅续传，避免流式输出凭空消失。 */
+ *  页面刷新后 SSE 连接已断，靠它重新订阅续传，避免流式输出凭空消失。
+ *  亦用于跨机器同会话：发送前探测 / 空闲轮询，保证一会话同时只有一个执行。 */
 export const sessionActiveRun = (token: string | null, sid: number) =>
   req(buildUrl(`/api/sessions/${sid}/active-run`, token)) as Promise<{
     active: boolean

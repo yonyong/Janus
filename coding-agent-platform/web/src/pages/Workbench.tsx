@@ -186,6 +186,24 @@ export default function Workbench() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sid, token])
 
+  // 跨机器同会话：本端空闲时周期性探测 active-run；对端已开跑则自动挂接流并进入 busy，
+  // 避免本端仍可点发送、随后撞上单飞闸门才发现。窗口重新聚焦时也立即探测一次。
+  useEffect(() => {
+    const probe = () => {
+      if (busy) return
+      if (esRef.current && esRef.current.readyState !== EventSource.CLOSED) return
+      void recover()
+    }
+    const id = window.setInterval(probe, 4000)
+    const onFocus = () => probe()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      window.clearInterval(id)
+      window.removeEventListener('focus', onFocus)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sid, token, busy])
+
   /** 工作流看板：阶段、用例统计、会话数、改动文件、验收结论。 */
   const loadFlow = useCallback(
     async (silent = false) => {
@@ -281,11 +299,14 @@ export default function Workbench() {
    * 订阅一次 agent 运行的 SSE 流。用户点击发送与「刷新/断线后续传」共用：
    * 后端以 (session, message) 幂等，重连同一消息会续传同一 run，并从事件 0
    * 完整回放已产生的内容，不会重复调用 agent。
+   *
+   * @param text 触发/续传的消息正文
+   * @param opts.attach 为 true 时表示挂接对端已启动的 run（不乐观追加用户气泡）
    */
-  const runStream = (text: string) => {
+  const runStream = (text: string, _opts?: { attach?: boolean }) => {
     if (esRef.current && esRef.current.readyState === EventSource.OPEN) return
     setBusy(true)
-    // 用户消息落库发生在后端 resolve_run；续传场景历史加载已带回该消息，去重防止气泡重复
+    // 用户消息落库发生在后端 resolve_run；续传/挂接场景历史或对端已写入，去重防止气泡重复
     setConv((c) =>
       c.some((m) => m.role === 'user' && m.content === text) ? c : [...c, { role: 'user', content: text }],
     )
@@ -337,6 +358,27 @@ export default function Workbench() {
         return
       }
       if (d.type === 'error') {
+        // 会话单飞：对端已在跑时本端新提问被拒。撤掉乐观用户气泡，挂接到进行中的 run。
+        if (d.code === 'session_busy') {
+          es.close()
+          setBusy(false)
+          streamRef.current = ''
+          setStreamText('')
+          setStatusText('')
+          setConv((c) => {
+            const last = c[c.length - 1]
+            if (last?.role === 'user' && last.content === text) return c.slice(0, -1)
+            return c
+          })
+          message.warning(d.text || '会话正在运行中，请等待完成或先中止后再提问')
+          const activeMsg = typeof d.active_message === 'string' ? d.active_message : null
+          if (activeMsg) {
+            window.setTimeout(() => runStream(activeMsg, { attach: true }), 0)
+          } else {
+            window.setTimeout(() => void recover(), 0)
+          }
+          return
+        }
         setConv((c) => [...c, { role: 'agent', content: '错误：' + (d.text || '未知错误') }])
         es.close()
         setBusy(false)
@@ -401,15 +443,30 @@ export default function Workbench() {
     if (esRef.current && esRef.current.readyState !== EventSource.CLOSED) return
     try {
       const r = await sessionActiveRun(token, sessionId)
-      if (r.active && r.message) runStream(r.message)
+      if (r.active && r.message) runStream(r.message, { attach: true })
     } catch {
       /* 接口不可达（多半网络也断了），等用户刷新页面 */
     }
   }
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
     if (busy) return
     setStepHint(null)
+    // 跨机器同会话：发送前先问权威状态。已有对端 run 则挂接其流，不另起提问。
+    try {
+      const r = await sessionActiveRun(token, sessionId)
+      if (r.active && r.message) {
+        if (r.message === text) {
+          runStream(text, { attach: true })
+          return
+        }
+        message.warning('会话正在运行中，已接上当前输出；请等待完成或先中止后再提问')
+        runStream(r.message, { attach: true })
+        return
+      }
+    } catch {
+      /* active-run 不可达时仍尝试发送，由后端单飞闸门兜底 */
+    }
     runStream(text)
   }
 

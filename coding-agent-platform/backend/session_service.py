@@ -7,6 +7,12 @@
   agent（避免重复改盘 / 重复落库）。
 - run 完成后由 DB 回放（replay），内存中的 run 状态在最后一个订阅者离开后清理，
   不会无限增长。
+
+单飞约束（跨机器同会话）：
+- 同一 session 同一时刻只允许一个未完成的 run。
+- 不同 message 在已有 run 进行中时拒绝新建（SessionBusyError），避免双端同时提问
+  交错落库 / 互相改盘，导致最终对话展示错乱。
+- 同一 message 重连仍走 live / replay 幂等路径，不受单飞影响。
 """
 import asyncio
 import datetime
@@ -27,6 +33,21 @@ from .agent_runtime import AgentRegistry
 _RUNS: dict = {}          # run_id -> _RunState
 _RUN_KEY: dict = {}       # (session_id, message) -> run_id
 _TICK = object()          # 唤醒订阅者的空信号
+
+
+class SessionBusyError(RuntimeError):
+    """会话已有进行中的 run，拒绝用另一条消息再开新 run。
+
+    携带 active_run_id / active_message，供 SSE 层回给前端做提示或续传挂接。
+    """
+
+    def __init__(self, active_run_id, active_message):
+        self.active_run_id = active_run_id
+        self.active_message = active_message
+        brief = (active_message or "").strip().replace("\n", " ")[:80]
+        super().__init__(
+            f"会话正在运行中（{brief or '进行中'}），请等待完成或先中止后再提问"
+        )
 
 
 class _RunState:
@@ -142,6 +163,9 @@ class SessionService:
         - live:   已有正在进行的 run，调用方应订阅其实时流（断线续传，不重复调用 agent）。
         - new:    尚无输出，已创建新 run 并在后台执行。
 
+        若该会话已有另一条消息的进行中 run，抛出 SessionBusyError（单飞：一会话同时
+        只跑一个 agent），调用方应拒绝本次提问而不是静默开第二条并行流。
+
         actor 是触发者的身份（见 audit.identify），只用于 Agent 调用留痕。
         """
         key = (session_id, message)
@@ -155,6 +179,23 @@ class SessionService:
             LOG.emit(pid, f"复用进行中的运行（会话 #{session_id}）：{brief}", level="debug",
                      source="session", meta={"session_id": session_id, "run_id": existing})
             return "live", existing
+
+        # 会话单飞：已有其它消息的进行中 run 时禁止新建（跨机器同 URL 并发提问的权威闸门）。
+        # 必须放在 replay / new 之前：否则另一端的不同文案会并行落库并交错改盘。
+        active_id, active_msg = SessionService.active_run_for_session(session_id)
+        if active_id is not None:
+            LOG.emit(
+                pid,
+                f"拒绝并发提问（会话 #{session_id} 已有运行 {active_id}）",
+                level="warn",
+                source="session",
+                meta={
+                    "session_id": session_id,
+                    "run_id": active_id,
+                    "blocked_message": brief,
+                },
+            )
+            raise SessionBusyError(active_id, active_msg)
 
         # DB 侧判定是否已存在完成态运行
         msgs = R.MessageRepo.list_by_session(conn, session_id)
