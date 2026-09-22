@@ -704,7 +704,7 @@ export default function Workbench() {
   }
 
   return (
-    <div className="wb-immersive">
+    <div className={`wb-immersive${auxList.some((x) => x.mode === 'docked' && !x.minimized) ? ' wb-aux-expanded' : ''}`}>
       <div className="wb-top">
         <Space size={10} style={{ minWidth: 0 }}>
           <Button size="small" icon={<ArrowLeftOutlined />} onClick={back}>
@@ -833,6 +833,17 @@ export default function Workbench() {
             list.map((x) => (x.id === id ? { ...x, minimized: !x.minimized } : x)),
           )
         }
+        onActivate={(id) =>
+          setAuxList((list) =>
+            list.map((x) =>
+              x.mode !== 'docked'
+                ? x
+                : x.id === id
+                  ? { ...x, minimized: false }
+                  : { ...x, minimized: true },
+            ),
+          )
+        }
       />
 
       <AuxScreenConfigModal
@@ -864,7 +875,10 @@ export default function Workbench() {
             window.open(url, `_blank`)
             message.success('已打开副屏标签页')
           } else {
-            setAuxList((list) => [...list, inst])
+            setAuxList((list) => [
+              ...list.map((x) => (x.mode === 'docked' ? { ...x, minimized: true } : x)),
+              inst,
+            ])
           }
         }}
       />
