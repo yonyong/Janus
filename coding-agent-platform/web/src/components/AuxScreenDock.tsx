@@ -57,43 +57,34 @@ function AuxHalf({
   )
 }
 
-/** 钉在工作台的副屏：底栏窗 + 最小化芯片。 */
+/**
+ * 钉在工作台的副屏：
+ * - 展开时接近全屏（盖住主工作区），底部始终保留副屏标签条
+ * - 点标签可唤出；点已激活标签再次最小化
+ */
 export default function AuxScreenDock({
   instances,
   onChange,
   onClose,
   onToggleMinimize,
+  onActivate,
   ctx,
 }: {
   instances: AuxScreenInstance[]
   onChange: (id: string, patch: Partial<AuxScreenInstance>) => void
   onClose: (id: string) => void
   onToggleMinimize: (id: string) => void
+  /** 点未激活标签：展开该副屏（并收起其它展开的） */
+  onActivate: (id: string) => void
   ctx: PaneCtx
 }) {
   const docked = instances.filter((x) => x.mode === 'docked')
   if (!docked.length) return null
 
-  const chips = docked.filter((x) => x.minimized)
   const open = docked.filter((x) => !x.minimized)
 
   return (
-    <div className="aux-dock-root">
-      {chips.length > 0 && (
-        <div className="aux-chip-bar">
-          {chips.map((inst, i) => (
-            <button
-              key={inst.id}
-              type="button"
-              className="aux-chip"
-              onClick={() => onToggleMinimize(inst.id)}
-              title="唤出副屏"
-            >
-              {auxLabel(inst, docked.indexOf(inst))}
-            </button>
-          ))}
-        </div>
-      )}
+    <div className={`aux-dock-root${open.length ? ' is-expanded' : ''}`}>
       {open.map((inst) => (
         <div key={inst.id} className="aux-dock-window">
           <div className="aux-dock-title">
@@ -133,6 +124,24 @@ export default function AuxScreenDock({
           </div>
         </div>
       ))}
+
+      {/* 底部标签始终展示：再次点击已激活标签可最小化 */}
+      <div className="aux-chip-bar">
+        {docked.map((inst, i) => {
+          const active = !inst.minimized
+          return (
+            <button
+              key={inst.id}
+              type="button"
+              className={`aux-chip${active ? ' is-active' : ''}`}
+              title={active ? '再次点击最小化' : '唤出副屏'}
+              onClick={() => (active ? onToggleMinimize(inst.id) : onActivate(inst.id))}
+            >
+              {auxLabel(inst, i)}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
