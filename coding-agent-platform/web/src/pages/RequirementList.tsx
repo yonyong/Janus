@@ -306,7 +306,7 @@ export default function RequirementList() {
                         title={
                           <div className="req-tile-desc-tip">{truncateReqDesc(r.description)}</div>
                         }
-                        styles={{ body: { maxWidth: 360, padding: '8px 10px' } }}
+                        styles={{ root: { maxWidth: 360 } }}
                       >
                         <span>{r.description}</span>
                       </Tooltip>

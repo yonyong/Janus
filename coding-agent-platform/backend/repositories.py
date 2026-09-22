@@ -129,8 +129,11 @@ class AgentRepo:
 
 class ProjectRepo:
     @staticmethod
-    def create(conn, name, disk_path):
-        cur = conn.execute("INSERT INTO projects(name,disk_path) VALUES(?,?)", (name, disk_path))
+    def create(conn, name, disk_path, log_dir=None):
+        cur = conn.execute(
+            "INSERT INTO projects(name,disk_path,log_dir) VALUES(?,?,?)",
+            (name, disk_path, log_dir),
+        )
         conn.commit()
         return ProjectRepo.get(conn, cur.lastrowid)
 
@@ -151,11 +154,11 @@ class ProjectRepo:
         return [row_to_dict(r) for r in rows]
 
     @staticmethod
-    def update(conn, pid, name=_UNSET, disk_path=_UNSET):
+    def update(conn, pid, name=_UNSET, disk_path=_UNSET, log_dir=_UNSET):
         """部分更新：只有显式传入的字段才会被修改（未传入的保持原值）。"""
         fields = []
         args = []
-        for col, val in (("name", name), ("disk_path", disk_path)):
+        for col, val in (("name", name), ("disk_path", disk_path), ("log_dir", log_dir)):
             if val is not _UNSET:
                 fields.append(f"{col}=?")
                 args.append(val)

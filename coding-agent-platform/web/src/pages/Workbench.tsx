@@ -8,8 +8,9 @@ import {
   MenuUnfoldOutlined,
   PauseCircleOutlined,
   PlusOutlined,
+  DesktopOutlined,
 } from '@ant-design/icons'
-import { useToken } from '../auth'
+import { useToken, useAuth } from '../auth'
 import {
   Message,
   Requirement,
@@ -19,12 +20,14 @@ import {
   TestCase,
   WorkflowState,
   Agent,
+  Project,
   abortSessionRun,
   createSession,
   describeError,
   importCasesFromWorkspace,
   listAgents,
   listCases,
+  listProjects,
   listRequirements,
   requirementWorkflow,
   sessionActiveRun,
@@ -41,6 +44,16 @@ import FileWorkArea, { STAGE_CAT } from '../components/FileWorkArea'
 import type { Cat } from '../components/FileWorkArea'
 import RequirementPane from '../components/RequirementPane'
 import { runMetaFromDone, type RunMeta } from '../runMeta'
+import AuxScreenConfigModal from '../components/AuxScreenConfigModal'
+import AuxScreenDock from '../components/AuxScreenDock'
+import ProjectSettingsModal from '../components/ProjectSettingsModal'
+import {
+  AuxScreenInstance,
+  auxLabel,
+  buildAuxPopupUrl,
+  newAuxId,
+  saveAuxSnapshot,
+} from '../components/auxScreen'
 
 /**
  * 沉浸式工作台（2026-09 重设计版）：
@@ -57,6 +70,7 @@ export default function Workbench() {
   const sessionId = Number(sid)
   const [params] = useSearchParams()
   const token = useToken()
+  const { isAdmin } = useAuth()
   const { message } = AntdApp.useApp()
   const navigate = useNavigate()
 
@@ -95,10 +109,34 @@ export default function Workbench() {
   const draggingRef = useRef(false)
   const bodyRef = useRef<HTMLDivElement | null>(null)
 
+  // 副屏实例（钉住 / 弹出）
+  const [auxOpen, setAuxOpen] = useState(false)
+  const [auxList, setAuxList] = useState<AuxScreenInstance[]>([])
+  const [projectMeta, setProjectMeta] = useState<Project | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
   // 项目 id 优先取会话详情，URL 参数只作兜底（旧链接、详情接口失败时仍能显示文件面板）
   const pidParam = params.get('pid')
   const pid = info?.project_id ?? (pidParam ? Number(pidParam) : null)
   const rid = requirement?.id ?? info?.requirement?.id ?? null
+
+  useEffect(() => {
+    if (pid == null) {
+      setProjectMeta(null)
+      return
+    }
+    let alive = true
+    listProjects(token)
+      .then((ps) => {
+        if (alive) setProjectMeta(ps.find((p) => p.id === pid) || null)
+      })
+      .catch(() => {
+        if (alive) setProjectMeta(null)
+      })
+    return () => {
+      alive = false
+    }
+  }, [pid, token, settingsOpen])
 
   // ---------------- 数据加载 ----------------
 
@@ -609,6 +647,7 @@ export default function Workbench() {
       '4': () => setCat('cases'),
       '5': () => setCat('arch'),
       '6': () => setCat('help'),
+      '7': () => setCat('logs'),
       b: () => {
         setLeftCollapsed((v) => !v)
         setLeftPx(null)
@@ -630,6 +669,39 @@ export default function Workbench() {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [])
+
+  const paneCtx = {
+    token,
+    pid,
+    rid,
+    requirement,
+    flow,
+    cases,
+    casesLoading,
+    diskPath: info?.disk_path ?? undefined,
+    sessionId,
+    refreshSignal: fsSignal,
+    busy,
+    onUseCommand,
+    onDocSaved: (r: Requirement) => {
+      setRequirement(r)
+      void loadFlow(true)
+    },
+    onReloadCases: async (silent?: boolean) => {
+      await loadCases(!!silent)
+      await loadFlow(true)
+    },
+    onReverted: () => {
+      setFsSignal((n) => n + 1)
+      void loadFlow(true)
+    },
+    onAskAgent:
+      busy || !requirement
+        ? undefined
+        : () => paneRef.current?.loadDraft(verifyCasesPrompt(requirement?.dir_name || '')),
+    isAdmin,
+    onOpenProjectSettings: isAdmin && projectMeta ? () => setSettingsOpen(true) : undefined,
+  }
 
   return (
     <div className="wb-immersive">
@@ -668,6 +740,9 @@ export default function Workbench() {
           </Space>
         </Space>
         <Space size={10}>
+          <Button size="small" icon={<DesktopOutlined />} onClick={() => setAuxOpen(true)}>
+            副屏
+          </Button>
           {busy && (
             <Button
               size="small"
@@ -716,38 +791,9 @@ export default function Workbench() {
             <span className="wb-split-grip" />
           </div>
           <FileWorkArea
-            token={token}
-            pid={pid}
-            rid={rid}
             cat={cat}
             onCatChange={setCat}
-            requirement={requirement}
-            flow={flow}
-            cases={cases}
-            casesLoading={casesLoading}
-            diskPath={info?.disk_path ?? undefined}
-            sessionId={sessionId}
-            refreshSignal={fsSignal}
-            busy={busy}
-            onUseCommand={onUseCommand}
-            onDocSaved={(r) => {
-              setRequirement(r)
-              void loadFlow(true)
-            }}
-            onReloadCases={async (silent) => {
-              await loadCases(!!silent)
-              await loadFlow(true)
-            }}
-            onReverted={() => {
-              // 回退动了盘上的文件，文件树与看板都得重新读
-              setFsSignal((n) => n + 1)
-              void loadFlow(true)
-            }}
-            onAskAgent={
-              busy || !requirement
-                ? undefined
-                : () => paneRef.current?.loadDraft(verifyCasesPrompt(requirement?.dir_name || ''))
-            }
+            {...paneCtx}
           />
         </section>
 
@@ -774,6 +820,67 @@ export default function Workbench() {
           />
         </section>
       </div>
+
+      <AuxScreenDock
+        instances={auxList}
+        ctx={paneCtx}
+        onChange={(id, patch) => {
+          setAuxList((list) => list.map((x) => (x.id === id ? { ...x, ...patch } : x)))
+        }}
+        onClose={(id) => setAuxList((list) => list.filter((x) => x.id !== id))}
+        onToggleMinimize={(id) =>
+          setAuxList((list) =>
+            list.map((x) => (x.id === id ? { ...x, minimized: !x.minimized } : x)),
+          )
+        }
+      />
+
+      <AuxScreenConfigModal
+        open={auxOpen}
+        onCancel={() => setAuxOpen(false)}
+        onConfirm={(cfg) => {
+          setAuxOpen(false)
+          if (pid == null) {
+            message.warning('项目未就绪，稍后再试')
+            return
+          }
+          const id = newAuxId()
+          const inst: AuxScreenInstance = {
+            id,
+            left: cfg.left,
+            right: cfg.right,
+            mode: cfg.mode,
+            minimized: false,
+            label: auxLabel(cfg),
+          }
+          saveAuxSnapshot(inst, { sid: sessionId, pid, rid })
+          if (cfg.mode === 'popup') {
+            const url = buildAuxPopupUrl(sessionId, id, {
+              pid,
+              rid,
+              left: cfg.left,
+              right: cfg.right,
+            })
+            window.open(url, `_blank`)
+            message.success('已打开副屏标签页')
+          } else {
+            setAuxList((list) => [...list, inst])
+          }
+        }}
+      />
+
+      <ProjectSettingsModal
+        open={settingsOpen}
+        project={projectMeta}
+        token={token}
+        onCancel={() => setSettingsOpen(false)}
+        onSaved={(p) => {
+          message.success('项目设置已保存')
+          setProjectMeta(p)
+          setSettingsOpen(false)
+          setFsSignal((n) => n + 1)
+        }}
+      />
     </div>
   )
 }

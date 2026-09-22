@@ -44,6 +44,8 @@ export interface Project {
   id: number
   name: string
   disk_path: string
+  /** 相对 disk_path 的日志子目录；未配置时为 null/空 */
+  log_dir?: string | null
 }
 
 /** 需求的工作流模式：full 标准四阶段 / lite 轻量（跳过澄清与用例，直接编码）。 */
@@ -475,7 +477,10 @@ export const deleteAgent = (id: number) =>
 export const listProjects = (token: string | null) =>
   req(buildUrl('/api/projects', token)) as Promise<Project[]>
 
-export const createProject = (token: string | null, body: { name: string; disk_path: string }) =>
+export const createProject = (
+  token: string | null,
+  body: { name: string; disk_path: string; log_dir?: string | null },
+) =>
   req(withAdmin(buildUrl('/api/projects', token)), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -489,13 +494,69 @@ export const deleteProject = (token: string | null, id: number) =>
 export const updateProject = (
   token: string | null,
   id: number,
-  body: { name?: string; disk_path?: string },
+  body: { name?: string; disk_path?: string; log_dir?: string | null },
 ) =>
   req(withAdmin(buildUrl(`/api/projects/${id}`, token)), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }) as Promise<Project>
+
+// ---------------- 项目磁盘日志（log_dir） ----------------
+
+export interface DiskLogFile {
+  path: string
+  name: string
+  size: number
+  mtime: number
+}
+
+export interface DiskLogListing {
+  log_dir_configured: boolean
+  log_dir: string | null
+  files: DiskLogFile[]
+}
+
+export interface DiskLogChunk {
+  path: string
+  offset: number
+  next_offset: number
+  size: number
+  content: string
+  eof: boolean
+  reset?: boolean
+}
+
+export const listProjectLogFiles = (token: string | null, pid: number) =>
+  req(buildUrl(`/api/projects/${pid}/log-files`, token)) as Promise<DiskLogListing>
+
+export const readProjectLogFile = (
+  token: string | null,
+  pid: number,
+  path: string,
+  params: { offset?: number; tail?: boolean; max_bytes?: number } = {},
+) => {
+  const qp: Record<string, string | number | undefined> = { path }
+  if (params.offset != null) qp.offset = params.offset
+  if (params.tail) qp.tail = '1'
+  if (params.max_bytes != null) qp.max_bytes = params.max_bytes
+  return req(buildUrl(`/api/projects/${pid}/log-files/content`, token, qp)) as Promise<DiskLogChunk>
+}
+
+export function streamProjectLogFile(
+  pid: number,
+  path: string,
+  token: string | null,
+  afterOffset?: number,
+): EventSource {
+  const u = new URL(`/api/projects/${pid}/log-files/stream`, window.location.origin)
+  u.searchParams.set('path', path)
+  if (afterOffset != null) u.searchParams.set('after_offset', String(afterOffset))
+  if (token) u.searchParams.set('token', token)
+  const a = getAdminToken()
+  if (a) u.searchParams.set('admin', a)
+  return new EventSource(u.toString())
+}
 
 export const issueToken = (token: string | null, pid: number, body: IssueTokenBody) =>
   req(withAdmin(buildUrl(`/api/projects/${pid}/issue-token`, token)), {
@@ -1352,7 +1413,10 @@ export const adminBatchDeleteProjects = (ids: number[]) =>
   }) as Promise<{ deleted: number }>
 
 /** 管理台编辑项目信息：只提交要改的字段，未提交的保持原值。 */
-export const adminUpdateProject = (pid: number, body: { name?: string; disk_path?: string }) =>
+export const adminUpdateProject = (
+  pid: number,
+  body: { name?: string; disk_path?: string; log_dir?: string | null },
+) =>
   req(adminUrl(`/api/admin/projects/${pid}`), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

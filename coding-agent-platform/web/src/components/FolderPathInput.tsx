@@ -8,20 +8,36 @@ interface FolderPathInputProps {
   onChange?: (value: string) => void
   placeholder?: string
   disabled?: boolean
+  /** 限制浏览根目录（绝对路径）；与 relative 配合可选项目内相对路径 */
+  rootPath?: string
+  relative?: boolean
+  pickerTitle?: string
 }
 
 /**
  * 本地工程路径输入：点击「浏览」选择目录。
  * - 桌面端（pywebview）：弹系统文件夹对话框，返回真实绝对路径；
- * - 其余（浏览器）：弹网页版目录选择器（后端列目录），避开 webkitdirectory
- *   那个「将 N 个文件上传到此网站」的确认框、以及它拿不到绝对路径的问题。
+ * - 其余（浏览器）：弹网页版目录选择器。
+ * 当提供 rootPath+relative 时（如选 log_dir），跳过桌面原生对话框，走受限网页选择器。
  */
-export default function FolderPathInput({ value, onChange, placeholder, disabled }: FolderPathInputProps) {
+export default function FolderPathInput({
+  value,
+  onChange,
+  placeholder,
+  disabled,
+  rootPath,
+  relative,
+  pickerTitle,
+}: FolderPathInputProps) {
   const [pickerOpen, setPickerOpen] = useState(false)
 
   const emit = (v: string) => onChange?.(v)
 
   const pick = async () => {
+    if (rootPath && relative) {
+      setPickerOpen(true)
+      return
+    }
     const api = (window as any).pywebview?.api
     if (api && typeof api.select_folder === 'function') {
       try {
@@ -34,6 +50,11 @@ export default function FolderPathInput({ value, onChange, placeholder, disabled
     }
     setPickerOpen(true)
   }
+
+  const initialAbs =
+    rootPath && relative && value
+      ? `${rootPath.replace(/\/+$/, '')}/${value}`.replace(/\\/g, '/')
+      : value
 
   return (
     <>
@@ -57,7 +78,10 @@ export default function FolderPathInput({ value, onChange, placeholder, disabled
       />
       <DirPickerModal
         open={pickerOpen}
-        initialPath={value}
+        initialPath={initialAbs}
+        rootPath={rootPath}
+        relative={relative}
+        title={pickerTitle}
         onCancel={() => setPickerOpen(false)}
         onSelect={(p) => {
           emit(p)

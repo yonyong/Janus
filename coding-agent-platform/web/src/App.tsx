@@ -43,6 +43,7 @@ import Dashboard from './pages/Dashboard'
 import ProjectList from './pages/ProjectList'
 import RequirementList from './pages/RequirementList'
 import Workbench from './pages/Workbench'
+import AuxScreenPage from './pages/AuxScreenPage'
 import AgentList from './pages/AgentList'
 import AdminConsole from './pages/AdminConsole'
 import LogViewer from './pages/LogViewer'
@@ -170,6 +171,7 @@ function Shell() {
       <Route path="/projects" element={<ProjectList />} />
       <Route path="/projects/:pid" element={<RequirementList />} />
       <Route path="/workbench/:sid" element={<Workbench />} />
+      <Route path="/workbench/:sid/aux/:auxId" element={<AuxScreenPage />} />
       <Route
         path="/agents"
         element={

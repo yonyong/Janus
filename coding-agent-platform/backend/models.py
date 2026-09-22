@@ -32,12 +32,19 @@ class AgentTestIn(BaseModel):
 class ProjectCreate(BaseModel):
     name: str
     disk_path: str
+    # 相对 disk_path 的日志子目录；空/省略表示未配置
+    log_dir: str | None = None
 
 
 class ProjectUpdate(BaseModel):
-    """项目信息的部分更新：只改显式传入的字段。"""
+    """项目信息的部分更新：只改显式传入的字段。
+
+    log_dir：字段未出现在请求体 → 不改（不在 model_fields_set）；
+    显式传 null 或 "" → 清空；非空字符串 → 校验后写入。
+    """
     name: str | None = None
     disk_path: str | None = None
+    log_dir: str | None = None
 
 
 class RequirementCreate(BaseModel):

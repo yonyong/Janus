@@ -40,6 +40,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ['Alt', '4'], desc: '用例' },
       { keys: ['Alt', '5'], desc: '归档' },
       { keys: ['Alt', '6'], desc: '帮助' },
+      { keys: ['Alt', '7'], desc: '日志' },
       { keys: ['Alt', 'B'], desc: '收起 / 展开左栏' },
     ],
   },

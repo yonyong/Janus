@@ -25,6 +25,7 @@ import {
   DeleteOutlined,
   LinkOutlined,
   PlusOutlined,
+  SettingOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons'
 import { useToken, useAuth } from '../auth'
@@ -38,6 +39,7 @@ import {
 } from '../api'
 import ProjectCard from '../components/ProjectCard'
 import FolderPathInput from '../components/FolderPathInput'
+import ProjectSettingsModal from '../components/ProjectSettingsModal'
 
 const PAGE_SIZE = 9
 
@@ -55,6 +57,7 @@ export default function ProjectList() {
   const [createOpen, setCreateOpen] = useState(false)
   const [shareTarget, setShareTarget] = useState<Project | null>(null)
   const [shareLink, setShareLink] = useState('')
+  const [settingsTarget, setSettingsTarget] = useState<Project | null>(null)
   const [form] = Form.useForm()
 
   const load = async () => {
@@ -158,7 +161,7 @@ export default function ProjectList() {
     },
     {
       title: '操作',
-      width: isAdmin ? 220 : 100,
+      width: isAdmin ? 280 : 100,
       render: (_: any, r: Project) => (
         <Space size={4}>
           <Button type="link" size="small" onClick={() => navigate(`/projects/${r.id}`)}>
@@ -166,6 +169,9 @@ export default function ProjectList() {
           </Button>
           {isAdmin && (
             <>
+              <Button type="link" size="small" icon={<SettingOutlined />} onClick={() => setSettingsTarget(r)}>
+                设置
+              </Button>
               <Button type="link" size="small" icon={<LinkOutlined />} onClick={() => genLink(r)}>
                 分享
               </Button>
@@ -236,6 +242,7 @@ export default function ProjectList() {
                     project={p}
                     onOpen={() => navigate(`/projects/${p.id}`)}
                     onShare={isAdmin ? () => genLink(p) : undefined}
+                    onSettings={isAdmin ? () => setSettingsTarget(p) : undefined}
                     onDelete={
                       isAdmin
                         ? async () => {
@@ -330,6 +337,18 @@ export default function ProjectList() {
           </Space>
         )}
       </Modal>
+
+      <ProjectSettingsModal
+        open={!!settingsTarget}
+        project={settingsTarget}
+        token={token}
+        onCancel={() => setSettingsTarget(null)}
+        onSaved={() => {
+          message.success('项目设置已保存')
+          setSettingsTarget(null)
+          load()
+        }}
+      />
     </div>
   )
 }
